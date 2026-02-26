@@ -5,30 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { mockVisits, mockRooms, mockStages, Visit } from '@/lib/mockData';
-import { Camera, LogOut } from 'lucide-react';
+import { Camera } from 'lucide-react';
 
 export const NurseDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [visitId, setVisitId] = useState('');
   const [lastSearched, setLastSearched] = useState('VT-003');
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
-  const [selectedStage, setSelectedStage] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -50,12 +33,6 @@ export const NurseDashboard: React.FC = () => {
       setLastSearched(visitId);
       setVisitId('');
     }
-  };
-
-  const handleStageUpdate = () => {
-    console.log('Updating stage to:', selectedStage);
-    setSelectedVisit(null);
-    setSelectedStage('');
   };
 
   const getTimeInStage = (createdAt: string) => {
@@ -209,63 +186,13 @@ export const NurseDashboard: React.FC = () => {
                     <TableCell>{getRoomForVisit(visit)}</TableCell>
                     <TableCell>{getTimeInStage(visit.created_at)}</TableCell>
                     <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => setSelectedVisit(visit)}
-                          >
-                            Update Stage →
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Update Patient Stage</DialogTitle>
-                            <DialogDescription>
-                              Update the current stage for {visit.patient.first_name}{' '}
-                              {visit.patient.last_name}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">Current Stage</label>
-                              <div>
-                                <Badge
-                                  style={{
-                                    backgroundColor: visit.current_stage.color,
-                                    color: 'white',
-                                  }}
-                                >
-                                  {visit.current_stage.name}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">New Stage</label>
-                              <Select value={selectedStage} onValueChange={setSelectedStage}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select new stage" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {mockStages.map((stage) => (
-                                    <SelectItem key={stage.id} value={stage.name}>
-                                      {stage.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Button
-                              className="w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={handleStageUpdate}
-                              disabled={!selectedStage}
-                            >
-                              Update Stage
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => navigate(`/update-stage?visitId=${visit.visit_tracking_id}`)}
+                      >
+                        Update Stage →
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
