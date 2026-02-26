@@ -31,7 +31,15 @@ export const LoginForm: React.FC = () => {
           name: user.name,
           role: user.role
         }));
-        navigate('/dashboard');
+
+        // Redirect to role-specific dashboard
+        if (user.role === 'reception') {
+          navigate('/reception');
+        } else if (user.role === 'nurse') {
+          navigate('/nurse');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError('Invalid username or password');
       }
