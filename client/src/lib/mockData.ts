@@ -105,3 +105,49 @@ export const mockUsers = [
     role: 'reception',
   },
 ];
+
+export interface Room {
+  id: number;
+  name: string;
+  status: 'available' | 'occupied' | 'cleaning' | 'maintenance';
+  currentPatient?: string;
+  surgeon?: string;
+  procedure?: string;
+  startTime?: string;
+}
+
+export const mockRooms: Room[] = [
+  {
+    id: 1,
+    name: 'OR 1',
+    status: 'occupied',
+    currentPatient: 'Michael Williams',
+    surgeon: 'Dr. Smith',
+    procedure: 'Appendectomy',
+    startTime: '08:00',
+  },
+  {
+    id: 2,
+    name: 'OR 2',
+    status: 'occupied',
+    currentPatient: 'Emily Brown',
+    surgeon: 'Dr. Johnson',
+    procedure: 'Knee Replacement',
+    startTime: '09:30',
+  },
+  {
+    id: 3,
+    name: 'OR 3',
+    status: 'cleaning',
+  },
+  {
+    id: 4,
+    name: 'OR 4',
+    status: 'available',
+  },
+  {
+    id: 5,
+    name: 'OR 5',
+    status: 'maintenance',
+  },
+];
