@@ -6,6 +6,10 @@ export class Patient extends Model {
   public mrn!: string;
   public first_name!: string;
   public last_name!: string;
+  public date_of_birth!: Date;
+  public gender!: string;
+  public readonly created_at!: Date;
+  public readonly updated_at!: Date;
 }
 
 Patient.init({
@@ -25,6 +29,14 @@ Patient.init({
   },
   last_name: {
     type: DataTypes.STRING,
+    allowNull: false
+  },
+  date_of_birth: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+  gender: {
+    type: DataTypes.ENUM('male', 'female', 'other'),
     allowNull: false
   }
 }, {
