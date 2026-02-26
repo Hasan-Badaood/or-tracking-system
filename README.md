@@ -1,167 +1,119 @@
 # OR Patient Tracking System
 
-A full-stack Operating Room Patient Tracking System built with React, TypeScript, Node.js, and PostgreSQL.
+Full-stack web application for tracking patients in operating room environments. Built for University of Hertfordshire coursework.
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 Operatingtheatre/
-├── server/          # Backend API (Node.js + Express + PostgreSQL)
-├── client/          # Frontend (React + TypeScript + Vite)
-└── README.md        # This file
+├── server/          - Backend API
+├── client/          - Frontend application
+└── README.md
 ```
 
-## 🚀 Quick Start
+## Setup Instructions
 
-### Prerequisites
+### Requirements
 
-- **Node.js** v18 or higher
-- **pnpm** (recommended package manager)
-- **PostgreSQL** v12 or higher
+- Node.js v18+
+- PostgreSQL 12+
+- pnpm package manager
 
-### Install pnpm (if not already installed)
-
+Install pnpm if you don't have it:
 ```bash
 npm install -g pnpm
 ```
 
-### 1. Install Dependencies
+### Installation
 
-Install dependencies for both backend and frontend:
-
+1. Install dependencies:
 ```bash
-# Install backend dependencies
 cd server
 pnpm install
 
-# Install frontend dependencies
 cd ../client
 pnpm install
 ```
 
-### 2. Database Setup
-
-Create PostgreSQL database and tables (see `server/README.md` for detailed SQL scripts):
-
+2. Set up PostgreSQL database:
 ```bash
 psql -U postgres
 CREATE DATABASE or_tracking;
 ```
 
-Then run the SQL scripts from `server/README.md` to create tables and seed data.
+Run the SQL scripts in `server/README.md` to create tables.
 
-### 3. Configure Environment
-
-Update `server/.env` with your database credentials:
-
-```env
+3. Configure environment variables in `server/.env`:
+```
 PORT=3000
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=or_tracking
 DB_USER=postgres
 DB_PASSWORD=your_password
-JWT_SECRET=your_jwt_secret_key
+JWT_SECRET=your_secret_key
 ```
 
-### 4. Run the Application
+4. Start both servers:
 
-**Terminal 1 - Backend:**
+Backend (port 3000):
 ```bash
 cd server
 pnpm run dev
 ```
-Backend runs on `http://localhost:3000`
 
-**Terminal 2 - Frontend:**
+Frontend (port 5173):
 ```bash
 cd client
 pnpm run dev
 ```
-Frontend runs on `http://localhost:5173`
 
-## 📚 Documentation
+## Features Implemented
 
-- [Backend Documentation](./server/README.md) - API endpoints, database schema, setup
-- [Frontend Documentation](./client/README.md) - Components, routing, features
+Backend:
+- REST API with Express
+- PostgreSQL database using Sequelize
+- JWT-based authentication
+- User roles (Admin, Nurse, Reception)
+- Patient and visit management
+- Workflow stage tracking
 
-## 🎯 Features
+Frontend:
+- React with TypeScript
+- Tailwind CSS and shadcn/ui components
+- Protected routes
+- Dashboard with visit tracking
+- Auto-refresh every 30 seconds
 
-### Backend
-- ✅ RESTful API with Express.js
-- ✅ PostgreSQL database with Sequelize ORM
-- ✅ JWT authentication
-- ✅ User management (Admin, Nurse, Reception roles)
-- ✅ Patient and visit tracking
-- ✅ Stage-based workflow management
+## Tech Stack
 
-### Frontend
-- ✅ Modern React 18 with TypeScript
-- ✅ shadcn/ui component library
-- ✅ Tailwind CSS styling
-- ✅ Protected routes with authentication
-- ✅ Real-time visit tracking dashboard
-- ✅ Auto-refresh functionality
-- ✅ Responsive design
+Frontend: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Router, Axios
 
-## 🔧 Tech Stack
+Backend: Node.js, Express, TypeScript, Sequelize, PostgreSQL, JWT, bcrypt
 
-**Frontend:**
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- React Router
-- Axios
-- Lucide Icons
+## Notes
 
-**Backend:**
-- Node.js
-- Express.js
-- TypeScript
-- Sequelize ORM
-- PostgreSQL
-- JWT
-- bcrypt
+You'll need to create a test user in the database. Check `server/README.md` for instructions on generating the bcrypt hash.
 
-## 📝 Default Credentials
+Default test credentials:
+- Username: admin
+- Password: admin123
 
-Create a test user using bcrypt hash in the database (see `server/README.md`).
+## Development
 
-Example:
-- Username: `admin`
-- Password: `admin123`
-
-## 🛠️ Development Scripts
-
-### Backend
+Backend:
 ```bash
-pnpm run dev      # Start development server
-pnpm run build    # Build TypeScript
+pnpm run dev      # development
+pnpm run build    # compile TypeScript
 ```
 
-### Frontend
+Frontend:
 ```bash
-pnpm run dev      # Start development server
-pnpm run build    # Build for production
-pnpm run preview  # Preview production build
+pnpm run dev      # development
+pnpm run build    # production build
+pnpm run preview  # preview build
 ```
 
-## 📦 Project Timeline
+Project developed February 2026 for University of Hertfordshire.
 
-This project was developed from February 19-26, 2026:
-- **Week 1 (Feb 19-21)**: Backend development
-- **Week 2 (Feb 22-26)**: Frontend development and integration
-
-## 🤝 Contributing
-
-Internal project for University of Hertfordshire.
-
-## 📄 License
-
-Internal use only - OR Patient Tracking System
-
-## 👤 Author
-
-Hasan-Badaood (hb25abz@herts.ac.uk)
+Author: Hasan-Badaood (hb25abz@herts.ac.uk)
