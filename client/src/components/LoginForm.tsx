@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { authAPI } from '@/api/auth';
+import { mockUsers } from '@/lib/mockData';
 
 export const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,16 +17,26 @@ export const LoginForm: React.FC = () => {
     setError('');
     setLoading(true);
 
-    try {
-      const data = await authAPI.login({ username, password });
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
-    } finally {
+    // Simulate API delay
+    setTimeout(() => {
+      const user = mockUsers.find(
+        (u) => u.username === username && u.password === password
+      );
+
+      if (user) {
+        localStorage.setItem('token', 'mock-token-' + Date.now());
+        localStorage.setItem('user', JSON.stringify({
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role
+        }));
+        navigate('/dashboard');
+      } else {
+        setError('Invalid username or password');
+      }
       setLoading(false);
-    }
+    }, 500);
   };
 
   return (
@@ -38,7 +48,7 @@ export const LoginForm: React.FC = () => {
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="Enter your username"
+          placeholder="admin / nurse1 / reception"
           required
           autoComplete="username"
         />
@@ -50,19 +60,22 @@ export const LoginForm: React.FC = () => {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter your password"
+          placeholder="admin123 / nurse123 / reception123"
           required
           autoComplete="current-password"
         />
       </div>
       {error && (
-        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
           {error}
         </div>
       )}
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? 'Logging in...' : 'Login'}
       </Button>
+      <p className="text-xs text-gray-500 text-center mt-2">
+        Demo accounts: admin/admin123, nurse1/nurse123
+      </p>
     </form>
   );
 };

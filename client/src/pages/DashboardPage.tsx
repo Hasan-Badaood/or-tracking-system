@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { VisitCard } from '@/components/VisitCard';
 import { CreateVisitForm } from '@/components/CreateVisitForm';
 import { Button } from '@/components/ui/button';
-import { visitsAPI, Visit } from '@/api/visits';
+import { mockVisits, Visit } from '@/lib/mockData';
 import { LogOut, Plus, RefreshCw } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -16,16 +16,13 @@ export const DashboardPage: React.FC = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const fetchVisits = async () => {
-    try {
-      setRefreshing(true);
-      const data = await visitsAPI.getAll();
-      setVisits(data);
-    } catch (error) {
-      console.error('Failed to fetch visits:', error);
-    } finally {
+    setRefreshing(true);
+    // Simulate API delay
+    setTimeout(() => {
+      setVisits(mockVisits);
       setLoading(false);
       setRefreshing(false);
-    }
+    }, 500);
   };
 
   useEffect(() => {
@@ -135,6 +132,11 @@ export const DashboardPage: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Mock Data Badge */}
+      <div className="fixed bottom-4 right-4 bg-yellow-100 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-md text-sm">
+        Using Mock Data
+      </div>
     </div>
   );
 };

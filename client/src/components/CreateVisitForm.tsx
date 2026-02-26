@@ -3,7 +3,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
-import { visitsAPI } from '@/api/visits';
+import { mockVisits, mockPatients } from '@/lib/mockData';
 
 interface CreateVisitFormProps {
   onSuccess: () => void;
@@ -25,23 +25,17 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
     setError('');
     setLoading(true);
 
-    try {
-      await visitsAPI.create({
-        patient: {
-          mrn,
-          first_name: firstName,
-          last_name: lastName,
-        },
-      });
+    // Simulate API delay
+    setTimeout(() => {
+      // In real app, this would create a visit via API
+      console.log('Creating visit for:', { mrn, firstName, lastName });
+
       setMrn('');
       setFirstName('');
       setLastName('');
-      onSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create visit');
-    } finally {
       setLoading(false);
-    }
+      onSuccess();
+    }, 800);
   };
 
   return (
@@ -82,7 +76,7 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
             />
           </div>
           {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
               {error}
             </div>
           )}
