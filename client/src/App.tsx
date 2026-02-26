@@ -4,6 +4,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ReceptionDashboard } from './pages/ReceptionDashboard';
 import { NurseDashboard } from './pages/NurseDashboard';
+import { UpdateStagePage } from './pages/UpdateStagePage';
 import { FamilyPortal } from './pages/FamilyPortal';
 
 interface ProtectedRouteProps {
@@ -56,6 +57,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['nurse', 'admin']}>
               <NurseDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/update-stage"
+          element={
+            <ProtectedRoute allowedRoles={['nurse', 'admin']}>
+              <UpdateStagePage />
             </ProtectedRoute>
           }
         />
