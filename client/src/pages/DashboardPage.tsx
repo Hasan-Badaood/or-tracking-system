@@ -111,7 +111,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         ) : visits.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visits.map((visit) => (
+            {visits.map((visit: Visit) => (
               <VisitCard
                 key={visit.id}
                 visit={visit}
