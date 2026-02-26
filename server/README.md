@@ -6,7 +6,7 @@ Backend API for the Operating Room Patient Tracking System.
 
 - Node.js (v18 or higher)
 - PostgreSQL (v12 or higher)
-- npm or yarn
+- pnpm (recommended) or npm
 
 ## Setup Instructions
 
@@ -14,7 +14,7 @@ Backend API for the Operating Room Patient Tracking System.
 
 ```bash
 cd server
-npm install
+pnpm install
 ```
 
 ### 2. Database Setup
@@ -109,7 +109,7 @@ JWT_SECRET=your_jwt_secret_key_change_in_production
 ### 5. Run the Server
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 The server will start on `http://localhost:3000`
@@ -183,8 +183,8 @@ GET /health
 
 ## Development
 
-- `npm run dev` - Start development server with ts-node
-- `npm run build` - Build TypeScript to JavaScript
+- `pnpm run dev` - Start development server with ts-node
+- `pnpm run build` - Build TypeScript to JavaScript
 
 ## Project Structure
 

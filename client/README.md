@@ -16,14 +16,14 @@ React-based frontend application for the Operating Room Patient Tracking System.
 ## Prerequisites
 
 - Node.js (v18 or higher)
-- npm or yarn
+- pnpm (recommended) or npm
 - Backend server running on http://localhost:3000
 
 ## Installation
 
 ```bash
 cd client
-npm install
+pnpm install
 ```
 
 ## Development
@@ -31,7 +31,7 @@ npm install
 Start the development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 The app will be available at `http://localhost:5173`
@@ -41,13 +41,13 @@ The app will be available at `http://localhost:5173`
 Build for production:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Preview production build:
 
 ```bash
-npm run preview
+pnpm run preview
 ```
 
 ## Project Structure
@@ -188,8 +188,8 @@ Ensure the backend server is running on port 3000
 ### Build Errors
 Clear node_modules and reinstall:
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
 ```
 
 ## License
