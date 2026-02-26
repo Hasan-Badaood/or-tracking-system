@@ -4,6 +4,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { mockUsers } from '@/lib/mockData';
+import { Loader2 } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,7 +18,6 @@ export const LoginForm: React.FC = () => {
     setError('');
     setLoading(true);
 
-    // Simulate API delay
     setTimeout(() => {
       const user = mockUsers.find(
         (u) => u.username === username && u.password === password
@@ -32,7 +32,6 @@ export const LoginForm: React.FC = () => {
           role: user.role
         }));
 
-        // Redirect to role-specific dashboard
         if (user.role === 'reception') {
           navigate('/reception');
         } else if (user.role === 'nurse') {
@@ -48,42 +47,62 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
         <Input
           id="username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="admin / nurse1 / reception"
+          placeholder="Enter your username"
           required
           autoComplete="username"
+          className="h-11"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password" className="text-sm font-semibold">Password</Label>
         <Input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="admin123 / nurse123 / reception123"
+          placeholder="Enter your password"
           required
           autoComplete="current-password"
+          className="h-11"
         />
       </div>
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
           {error}
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'Logging in...' : 'Login'}
+      <Button
+        type="submit"
+        className="w-full h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700"
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Logging in...
+          </>
+        ) : (
+          'Login'
+        )}
       </Button>
-      <p className="text-xs text-gray-500 text-center mt-2">
-        Demo accounts: admin/admin123, nurse1/nurse123
-      </p>
+      <div className="pt-2 border-t border-gray-200">
+        <p className="text-xs text-gray-600 text-center mb-2 font-medium">
+          Demo Accounts:
+        </p>
+        <div className="space-y-1 text-xs text-gray-500">
+          <p><span className="font-semibold">Admin:</span> admin / admin123</p>
+          <p><span className="font-semibold">Nurse:</span> nurse1 / nurse123</p>
+          <p><span className="font-semibold">Reception:</span> reception / reception123</p>
+        </div>
+      </div>
     </form>
   );
 };
