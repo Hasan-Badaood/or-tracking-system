@@ -6,6 +6,8 @@ import { ReceptionDashboard } from './pages/ReceptionDashboard';
 import { NurseDashboard } from './pages/NurseDashboard';
 import { UpdateStagePage } from './pages/UpdateStagePage';
 import { FamilyPortal } from './pages/FamilyPortal';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { UserManagement } from './pages/UserManagement';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -66,6 +68,24 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['nurse', 'admin']}>
               <UpdateStagePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <UserManagement />
             </ProtectedRoute>
           }
         />

@@ -20,6 +20,7 @@ export interface Visit {
   current_stage: Stage;
   active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export const mockStages: Stage[] = [
@@ -47,6 +48,7 @@ export const mockVisits: Visit[] = [
     current_stage: mockStages[0],
     active: true,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   },
   {
     id: 2,
@@ -55,6 +57,7 @@ export const mockVisits: Visit[] = [
     current_stage: mockStages[2],
     active: true,
     created_at: new Date(Date.now() - 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 1800000).toISOString(),
   },
   {
     id: 3,
@@ -63,6 +66,7 @@ export const mockVisits: Visit[] = [
     current_stage: mockStages[3],
     active: true,
     created_at: new Date(Date.now() - 7200000).toISOString(),
+    updated_at: new Date(Date.now() - 3600000).toISOString(),
   },
   {
     id: 4,
@@ -71,6 +75,7 @@ export const mockVisits: Visit[] = [
     current_stage: mockStages[4],
     active: true,
     created_at: new Date(Date.now() - 10800000).toISOString(),
+    updated_at: new Date(Date.now() - 5400000).toISOString(),
   },
   {
     id: 5,
@@ -79,6 +84,7 @@ export const mockVisits: Visit[] = [
     current_stage: mockStages[1],
     active: true,
     created_at: new Date(Date.now() - 14400000).toISOString(),
+    updated_at: new Date(Date.now() - 10800000).toISOString(),
   },
 ];
 
