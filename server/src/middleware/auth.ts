@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { isBlacklisted } from '../lib/tokenBlocklist';
 
 declare global {
   namespace Express {
@@ -17,6 +18,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   }
 
   const token = authHeader.substring(7);
+
+  if (isBlacklisted(token)) {
+    return res.status(401).json({ error: 'Token has been revoked' });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!);

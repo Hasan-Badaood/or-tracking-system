@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { addToBlocklist } from '../lib/tokenBlocklist';
 
 interface AuthRequest extends Request {
   user?: {
@@ -89,8 +90,14 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = async (req: AuthRequest, res: Response) => {
   try {
-    // In a real implementation, you might want to blacklist the token
-    // For now, we just send a success response
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const decoded = jwt.decode(token) as { exp?: number } | null;
+      const expiresAt = decoded?.exp ? decoded.exp * 1000 : Date.now() + 8 * 60 * 60 * 1000;
+      addToBlocklist(token, expiresAt);
+    }
+
     res.json({
       success: true,
       message: 'Logged out successfully'
