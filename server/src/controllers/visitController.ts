@@ -118,7 +118,7 @@ export const getVisits = async (req: Request, res: Response) => {
         {
           model: ORRoom,
           as: 'or_room',
-          attributes: ['id', 'room_number', 'room_name', 'status'],
+          attributes: ['id', 'room_number', 'name', 'status'],
           required: false
         },
         {
@@ -190,10 +190,13 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (!current_stage_id) {
+    // Default to the first stage (Arrived) if not provided
+    const resolvedStageId = current_stage_id ?? (await Stage.findOne({ order: [['display_order', 'ASC']] }))?.id;
+
+    if (!resolvedStageId) {
       return res.status(400).json({
         success: false,
-        error: 'current_stage_id is required'
+        error: 'No stages found in database — run the seed script first'
       });
     }
 
@@ -209,7 +212,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
     }
 
     // Check if stage exists
-    const stage = await Stage.findByPk(current_stage_id);
+    const stage = await Stage.findByPk(resolvedStageId);
     if (!stage) {
       return res.status(400).json({
         success: false,
@@ -272,7 +275,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
     const visit = await Visit.create({
       visit_tracking_id,
       patient_id: patientRecord.id,
-      current_stage_id,
+      current_stage_id: resolvedStageId,
       or_room_id: or_room_id || null,
       created_by: req.user.id,
       notes: notes || null,
@@ -309,7 +312,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
         {
           model: ORRoom,
           as: 'or_room',
-          attributes: ['id', 'room_number', 'room_name', 'status'],
+          attributes: ['id', 'room_number', 'name', 'status'],
           required: false
         },
         {
@@ -358,7 +361,7 @@ export const getVisitById = async (req: Request, res: Response) => {
         {
           model: ORRoom,
           as: 'or_room',
-          attributes: ['id', 'room_number', 'room_name', 'status'],
+          attributes: ['id', 'room_number', 'name', 'status'],
           required: false
         },
         {
@@ -479,7 +482,7 @@ export const updateVisit = async (req: AuthRequest, res: Response) => {
         {
           model: ORRoom,
           as: 'or_room',
-          attributes: ['id', 'room_number', 'room_name', 'status'],
+          attributes: ['id', 'room_number', 'name', 'status'],
           required: false
         },
         {
