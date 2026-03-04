@@ -183,10 +183,10 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
 
     const { mrn, first_name, last_name, date_of_birth, gender } = patient;
 
-    if (!mrn || !first_name || !last_name || !date_of_birth || !gender) {
+    if (!mrn || !first_name || !last_name) {
       return res.status(400).json({
         success: false,
-        error: 'Patient mrn, first_name, last_name, date_of_birth, and gender are required'
+        error: 'Patient mrn, first_name, and last_name are required'
       });
     }
 

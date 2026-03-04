@@ -185,7 +185,7 @@ export const getStageDuration = async (req: Request, res: Response) => {
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0]
       },
-      stage_durations: results
+      durations: results
     });
   } catch (error) {
     console.error('Get stage duration error:', error);
