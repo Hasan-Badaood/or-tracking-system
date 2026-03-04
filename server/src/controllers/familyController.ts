@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { Visit, FamilyContact, FamilyToken, Patient, Stage } from '../models';
+import { sendOTPEmail } from '../lib/mailer';
 
 interface FamilyAuthRequest extends Request {
   familyToken?: {
@@ -95,14 +96,17 @@ export const requestOTP = async (req: Request, res: Response) => {
       is_locked: false
     });
 
-    // In production, send OTP via SMS/Email
-    // For now, just return success
-    console.log(`OTP for ${phone}: ${otp}`); // For development only
-
     const deliveryMethod = familyContact.email ? 'email' : 'sms';
     const maskedRecipient = familyContact.email
       ? familyContact.email.replace(/(.{1}).*(@.*)/, '$1***$2')
       : phone.replace(/(\+\d{3})\d+(\d{3})/, '$1***$2');
+
+    if (deliveryMethod === 'email' && familyContact.email) {
+      await sendOTPEmail(familyContact.email, otp, 'your relative');
+    } else {
+      // SMS gateway not yet integrated — log for development
+      console.log(`[DEV] OTP SMS to ${phone}: ${otp}`);
+    }
 
     res.json({
       success: true,
