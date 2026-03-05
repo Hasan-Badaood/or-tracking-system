@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,60 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-interface StaffUser {
-  id: number;
-  username: string;
-  name: string;
-  role: 'admin' | 'nurse' | 'reception';
-  email: string | null;
-  active: boolean;
-  last_login: string | null;
-  created_at: string;
-}
-
-const initialUsers: StaffUser[] = [
-  {
-    id: 1,
-    username: 'admin',
-    name: 'Admin User',
-    role: 'admin',
-    email: 'admin@hospital.nhs.uk',
-    active: true,
-    last_login: new Date(Date.now() - 3600000).toISOString(),
-    created_at: new Date(Date.now() - 30 * 24 * 3600000).toISOString(),
-  },
-  {
-    id: 2,
-    username: 'nurse1',
-    name: 'Nurse Johnson',
-    role: 'nurse',
-    email: 'nurse.johnson@hospital.nhs.uk',
-    active: true,
-    last_login: new Date(Date.now() - 7200000).toISOString(),
-    created_at: new Date(Date.now() - 25 * 24 * 3600000).toISOString(),
-  },
-  {
-    id: 3,
-    username: 'reception',
-    name: 'Reception Desk',
-    role: 'reception',
-    email: 'reception@hospital.nhs.uk',
-    active: true,
-    last_login: new Date(Date.now() - 1800000).toISOString(),
-    created_at: new Date(Date.now() - 20 * 24 * 3600000).toISOString(),
-  },
-  {
-    id: 4,
-    username: 'nurse2',
-    name: 'Nurse Williams',
-    role: 'nurse',
-    email: null,
-    active: false,
-    last_login: new Date(Date.now() - 14 * 24 * 3600000).toISOString(),
-    created_at: new Date(Date.now() - 60 * 24 * 3600000).toISOString(),
-  },
-];
+import { usersAPI, StaffUser } from '@/api/users';
+import { authAPI } from '@/api/auth';
+import { Loader2 } from 'lucide-react';
 
 const roleColors: Record<string, string> = {
   admin: 'bg-red-100 text-red-800',
@@ -86,24 +35,41 @@ const emptyForm = { username: '', name: '', email: '', role: '', password: '' };
 export const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const [users, setUsers] = useState<StaffUser[]>(initialUsers);
+  const [users, setUsers] = useState<StaffUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    usersAPI.getAll()
+      .then(setUsers)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // ignore
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
   };
 
-  const toggleActive = (id: number) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, active: !u.active } : u))
-    );
+  const toggleActive = async (u: StaffUser) => {
+    try {
+      const updated = await usersAPI.update(u.id, { active: !u.active });
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch {
+      // failed silently
+    }
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -112,25 +78,23 @@ export const UserManagement: React.FC = () => {
       return;
     }
 
-    if (users.some((u) => u.username === form.username)) {
-      setFormError('Username already exists.');
-      return;
+    setSaving(true);
+    try {
+      const newUser = await usersAPI.create({
+        username: form.username,
+        name: form.name,
+        role: form.role,
+        password: form.password,
+        ...(form.email && { email: form.email }),
+      });
+      setUsers((prev) => [newUser, ...prev]);
+      setForm(emptyForm);
+      setDialogOpen(false);
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Failed to create user');
+    } finally {
+      setSaving(false);
     }
-
-    const newUser: StaffUser = {
-      id: Math.max(...users.map((u) => u.id)) + 1,
-      username: form.username,
-      name: form.name,
-      role: form.role as StaffUser['role'],
-      email: form.email || null,
-      active: true,
-      last_login: null,
-      created_at: new Date().toISOString(),
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-    setForm(emptyForm);
-    setDialogOpen(false);
   };
 
   const formatDate = (iso: string | null) => {
@@ -276,8 +240,8 @@ export const UserManagement: React.FC = () => {
                       >
                         Cancel
                       </Button>
-                      <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                        Create
+                      <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
                       </Button>
                     </div>
                   </form>
@@ -286,66 +250,64 @@ export const UserManagement: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id} className={!u.active ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{u.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.username}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${roleColors[u.role]}`}
-                      >
-                        {u.role}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.email ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(u.last_login)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={u.active ? 'default' : 'secondary'}>
-                        {u.active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => toggleActive(u.id)}
-                        className={
-                          u.active
-                            ? 'text-red-600 border-red-200 hover:bg-red-50'
-                            : 'text-green-600 border-green-200 hover:bg-green-50'
-                        }
-                      >
-                        {u.active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Last Login</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id} className={!u.active ? 'opacity-50' : ''}>
+                      <TableCell className="font-medium">{u.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{u.username}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${roleColors[u.role]}`}
+                        >
+                          {u.role}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{u.email ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDate(u.last_login)}</TableCell>
+                      <TableCell>
+                        <Badge variant={u.active ? 'default' : 'secondary'}>
+                          {u.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleActive(u)}
+                          className={
+                            u.active
+                              ? 'text-red-600 border-red-200 hover:bg-red-50'
+                              : 'text-green-600 border-green-200 hover:bg-green-50'
+                          }
+                        >
+                          {u.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </main>
-
-      <div className="fixed bottom-4 right-4 bg-yellow-100 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-md text-sm shadow-lg">
-        Using Mock Data
-      </div>
     </div>
   );
 };
