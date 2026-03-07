@@ -60,14 +60,23 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('Database connection established successfully.');
 
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('Database synchronized.');
 
-    app.listen(PORT, () => {
+    const httpServer = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`API endpoints available at http://localhost:${PORT}/api`);
     });
+
+    const shutdown = () => {
+      httpServer.close(() => {
+        sequelize.close().then(() => process.exit(0)).catch(() => process.exit(1));
+      });
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
   } catch (error) {
     console.error('Unable to start server:', error);
     process.exit(1);
