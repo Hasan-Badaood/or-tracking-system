@@ -236,6 +236,98 @@ export const updateRoomStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// POST /rooms - Create a new OR room (admin only)
+export const createRoom = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const { name, room_number, room_type = 'General' } = req.body;
+
+    if (!name || !room_number) {
+      return res.status(400).json({ success: false, error: 'name and room_number are required' });
+    }
+
+    const existing = await ORRoom.findOne({ where: { room_number } });
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'Room number already exists' });
+    }
+
+    const room = await ORRoom.create({
+      name,
+      room_number,
+      room_type,
+      capacity: 'Standard',
+      status: 'Available',
+      last_status_change: new Date(),
+      active: true,
+    });
+
+    res.status(201).json({
+      success: true,
+      room: { id: room.id, name: room.name, room_number: room.room_number, status: room.status, active: room.active },
+    });
+  } catch (error) {
+    console.error('Create room error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// PUT /rooms/:id - Update room details (admin only)
+export const updateRoom = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+    const { name, room_number, room_type, active } = req.body;
+
+    const room = await ORRoom.findByPk(id);
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+
+    if (name !== undefined) room.name = name;
+    if (room_number !== undefined) room.room_number = room_number;
+    if (room_type !== undefined) room.room_type = room_type;
+    if (active !== undefined) room.active = active;
+    await room.save();
+
+    res.json({
+      success: true,
+      room: { id: room.id, name: room.name, room_number: room.room_number, status: room.status, active: room.active },
+    });
+  } catch (error) {
+    console.error('Update room error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// DELETE /rooms/:id - Soft-delete a room (admin only)
+export const deleteRoom = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+    const room = await ORRoom.findByPk(id);
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+
+    room.active = false;
+    await room.save();
+
+    res.json({ success: true, message: 'Room deactivated' });
+  } catch (error) {
+    console.error('Delete room error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // POST /rooms/:id/cleaning/start - Manually start cleaning timer
 export const startCleaning = async (req: AuthRequest, res: Response) => {
   try {
