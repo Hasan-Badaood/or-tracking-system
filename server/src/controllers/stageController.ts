@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { Visit, Stage, StageEvent, ORRoom, User } from '../models';
+import { Visit, Stage, StageEvent, ORRoom, User, FamilyContact, Patient } from '../models';
 import { sequelize } from '../config/database';
+import { notifyFamilyContacts } from '../services/notificationService';
 
 interface AuthRequest extends Request {
   user?: {
@@ -207,6 +208,32 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(response);
+
+    // Fire-and-forget family notifications (after response is sent)
+    try {
+      const fullVisit = await Visit.findByPk(visit.id, {
+        include: [
+          { model: FamilyContact, as: 'family_contacts', where: { consent_given: true }, required: false },
+          { model: Stage, as: 'current_stage', attributes: ['name'] },
+          { model: Patient, as: 'patient', attributes: ['first_name', 'last_name'] },
+        ],
+      });
+      const contacts = (fullVisit?.get('family_contacts') as any[]) ?? [];
+      if (contacts.length > 0) {
+        const patient = fullVisit?.get('patient') as any;
+        const patientName = patient
+          ? `${patient.first_name} ${patient.last_name}`
+          : 'your family member';
+        notifyFamilyContacts(contacts, {
+          patientName,
+          stageName: toStage.name,
+          visitTrackingId: visit.visit_tracking_id,
+          timestamp: new Date(),
+        }).catch((err) => console.error('Notification error:', err));
+      }
+    } catch (err) {
+      console.error('Notification lookup error:', err);
+    }
   } catch (error) {
     await transaction.rollback();
     console.error('Update visit stage error:', error);
@@ -262,19 +289,20 @@ export const getVisitTimeline = async (req: Request, res: Response) => {
     // Calculate duration_minutes between consecutive events
     const eventsWithDuration = stageEvents.map((event, index) => {
       const eventData = event.toJSON() as any;
+      // Sequelize with underscored:true may serialize as created_at or createdAt
+      const thisTs: string | undefined = eventData.created_at ?? eventData.createdAt;
+      eventData.created_at = thisTs;
 
       // Calculate duration from this event to the next (previous in time)
       if (index < stageEvents.length - 1) {
-        const currentTime = new Date(event.created_at).getTime();
-        const nextTime = new Date(stageEvents[index + 1].created_at).getTime();
-        const durationMs = currentTime - nextTime;
-        eventData.duration_minutes = Math.round(durationMs / 60000); // Convert to minutes
+        const nextData = stageEvents[index + 1].toJSON() as any;
+        const nextTs: string | undefined = nextData.created_at ?? nextData.createdAt;
+        const durationMs = new Date(thisTs!).getTime() - new Date(nextTs!).getTime();
+        eventData.duration_minutes = isFinite(durationMs) ? Math.round(durationMs / 60000) : null;
       } else {
         // For the oldest event, calculate duration from event time to now
-        const currentTime = new Date().getTime();
-        const eventTime = new Date(event.created_at).getTime();
-        const durationMs = currentTime - eventTime;
-        eventData.duration_minutes = Math.round(durationMs / 60000);
+        const durationMs = Date.now() - new Date(thisTs!).getTime();
+        eventData.duration_minutes = isFinite(durationMs) ? Math.round(durationMs / 60000) : null;
       }
 
       return eventData;
@@ -283,11 +311,10 @@ export const getVisitTimeline = async (req: Request, res: Response) => {
     // Calculate total duration from first event to now
     let totalDurationMinutes = 0;
     if (stageEvents.length > 0) {
-      const oldestEvent = stageEvents[stageEvents.length - 1];
-      const firstEventTime = new Date(oldestEvent.created_at).getTime();
-      const currentTime = new Date().getTime();
-      const totalMs = currentTime - firstEventTime;
-      totalDurationMinutes = Math.round(totalMs / 60000);
+      const oldestData = stageEvents[stageEvents.length - 1].toJSON() as any;
+      const oldestTs: string | undefined = oldestData.created_at ?? oldestData.createdAt;
+      const totalMs = Date.now() - new Date(oldestTs!).getTime();
+      totalDurationMinutes = isFinite(totalMs) ? Math.round(totalMs / 60000) : 0;
     }
 
     res.json({
@@ -309,30 +336,81 @@ export const getVisitTimeline = async (req: Request, res: Response) => {
 };
 
 /**
- * GET /stages - Get all available stages
- * Returns all active stages ordered by display_order
+ * GET /stages - Get stages (active only by default; ?all=true for all)
  */
 export const getAllStages = async (req: Request, res: Response) => {
   try {
-    // Fetch all active stages ordered by display_order
+    const where: any = {};
+    if (req.query.all !== 'true') where.active = true;
+
     const stages = await Stage.findAll({
-      where: {
-        active: true
-      },
+      where,
       order: [['display_order', 'ASC']],
       attributes: ['id', 'name', 'color', 'display_order', 'description', 'active']
     });
 
-    res.json({
-      success: true,
-      data: stages,
-      count: stages.length
-    });
+    res.json({ success: true, data: stages, count: stages.length });
   } catch (error) {
     console.error('Get all stages error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+/**
+ * POST /stages - Create a new stage (admin only)
+ */
+export const createStage = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const { name, color, display_order, description } = req.body;
+    if (!name || !color) {
+      return res.status(400).json({ success: false, error: 'name and color are required' });
+    }
+
+    const maxOrder = await Stage.max<number, Stage>('display_order') ?? 0;
+    const stage = await Stage.create({
+      name,
+      color,
+      display_order: display_order ?? maxOrder + 1,
+      description: description || null,
+      active: true
     });
+
+    res.status(201).json({ success: true, data: stage });
+  } catch (error) {
+    console.error('Create stage error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+/**
+ * PUT /stages/:id - Update a stage (admin only)
+ */
+export const updateStage = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const stage = await Stage.findByPk(req.params.id);
+    if (!stage) {
+      return res.status(404).json({ success: false, error: 'Stage not found' });
+    }
+
+    const { name, color, display_order, description, active } = req.body;
+    if (name !== undefined) stage.name = name;
+    if (color !== undefined) stage.color = color;
+    if (display_order !== undefined) stage.display_order = display_order;
+    if (description !== undefined) stage.description = description;
+    if (active !== undefined) stage.active = active;
+    await stage.save();
+
+    res.json({ success: true, data: stage });
+  } catch (error) {
+    console.error('Update stage error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
