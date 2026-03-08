@@ -27,6 +27,8 @@ export const LoginForm: React.FC = () => {
         navigate('/reception');
       } else if (data.user.role === 'nurse') {
         navigate('/nurse');
+      } else if (data.user.role === 'admin') {
+        navigate('/admin');
       } else {
         navigate('/dashboard');
       }
