@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { Visit, Patient, Stage, ORRoom, User, FamilyContact } from '../models';
+import { notifyFamilyContacts, notificationConfig } from '../services/notificationService';
 
 interface AuthRequest extends Request {
   user?: {
@@ -504,6 +505,52 @@ export const updateVisit = async (req: AuthRequest, res: Response) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+};
+
+// POST /visits/:id/notify - Manually send notification to family contacts
+export const notifyFamily = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const visit = await Visit.findByPk(req.params.id, {
+      include: [
+        { model: Patient, as: 'patient', attributes: ['first_name', 'last_name'] },
+        { model: Stage, as: 'current_stage', attributes: ['name'] },
+        { model: FamilyContact, as: 'family_contacts', where: { consent_given: true }, required: false },
+      ],
+    });
+
+    if (!visit) {
+      return res.status(404).json({ success: false, error: 'Visit not found' });
+    }
+
+    const contacts = (visit.get('family_contacts') as any[]) ?? [];
+    if (contacts.length === 0) {
+      return res.status(400).json({ success: false, error: 'No family contacts with consent found' });
+    }
+
+    const patient = visit.get('patient') as any;
+    const stage = visit.get('current_stage') as any;
+
+    const result = await notifyFamilyContacts(contacts, {
+      patientName: `${patient.first_name} ${patient.last_name}`,
+      stageName: stage.name,
+      visitTrackingId: visit.visit_tracking_id,
+      timestamp: new Date(),
+    });
+
+    res.json({
+      success: true,
+      sent: { email: result.email, sms: result.sms },
+      errors: result.errors,
+      config: notificationConfig,
+    });
+  } catch (error) {
+    console.error('Notify family error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
