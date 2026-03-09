@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { VisitCard } from '@/components/VisitCard';
 import { CreateVisitForm } from '@/components/CreateVisitForm';
@@ -7,24 +8,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { mockVisits, mockRooms, Visit, Room } from '@/lib/mockData';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { visitsAPI, Visit } from '@/api/visits';
+import { roomsAPI, Room } from '@/api/rooms';
 import { Plus, RefreshCw, Grid3x3, List, Activity, Users, Clock, AlertCircle } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingRoom, setUpdatingRoom] = useState<number | null>(null);
 
   const fetchData = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setVisits(mockVisits);
-      setRooms(mockRooms);
+    try {
+      const [visitsData, roomsData] = await Promise.all([
+        visitsAPI.getAll({ active: true, limit: 100 }),
+        roomsAPI.getAll(),
+      ]);
+      setVisits(visitsData.visits);
+      setRooms(roomsData);
+    } catch {
+      // keep existing data
+    } finally {
       setLoading(false);
       setRefreshing(false);
-    }, 500);
+    }
   };
 
   useEffect(() => {
@@ -32,6 +44,18 @@ export const DashboardPage: React.FC = () => {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleRoomStatusChange = async (roomId: number, status: Room['status']) => {
+    setUpdatingRoom(roomId);
+    try {
+      await roomsAPI.updateStatus(roomId, status);
+      setRooms((prev) => prev.map((r) => r.id === roomId ? { ...r, status } : r));
+    } catch {
+      // keep existing
+    } finally {
+      setUpdatingRoom(null);
+    }
+  };
 
   const handleCreateSuccess = () => {
     setShowForm(false);
@@ -53,7 +77,7 @@ export const DashboardPage: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Header
         title="OR Dashboard"
-        subtitle={`${visits.length} active patients • ${rooms.filter(r => r.status === 'available').length} rooms available`}
+        subtitle={`${visits.length} active patients • ${rooms.filter(r => r.status === 'Available').length} rooms available`}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
@@ -129,7 +153,11 @@ export const DashboardPage: React.FC = () => {
             ) : visits.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {visits.map((visit: Visit) => (
-                  <VisitCard key={visit.id} visit={visit} />
+                  <VisitCard
+                    key={visit.id}
+                    visit={visit}
+                    onClick={() => navigate(`/update-stage?visitId=${visit.visit_tracking_id}`)}
+                  />
                 ))}
               </div>
             ) : (
@@ -182,43 +210,40 @@ export const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {rooms.map((room) => (
                 <Card key={room.id} className={
-                  room.status === 'available' ? 'border-green-500' :
-                  room.status === 'occupied' ? 'border-red-500' :
-                  room.status === 'cleaning' ? 'border-yellow-500' :
-                  'border-gray-500'
+                  room.status === 'Available' ? 'border-l-4 border-l-green-500' :
+                  room.status === 'Occupied' ? 'border-l-4 border-l-red-500' :
+                  room.status === 'Cleaning' ? 'border-l-4 border-l-yellow-500' :
+                  'border-l-4 border-l-gray-400'
                 }>
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle>{room.name}</CardTitle>
+                      <CardTitle className="text-base">{room.name}</CardTitle>
                       <Badge variant={
-                        room.status === 'available' ? 'default' :
-                        room.status === 'occupied' ? 'destructive' :
+                        room.status === 'Available' ? 'default' :
+                        room.status === 'Occupied' ? 'destructive' :
                         'secondary'
                       }>
                         {room.status}
                       </Badge>
                     </div>
                   </CardHeader>
-                  {room.status === 'occupied' && (
-                    <CardContent className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Patient:</span>
-                        <p className="font-medium">{room.currentPatient}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Surgeon:</span>
-                        <p className="font-medium">{room.surgeon}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Procedure:</span>
-                        <p className="font-medium">{room.procedure}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Start Time:</span>
-                        <p className="font-medium">{room.startTime}</p>
-                      </div>
-                    </CardContent>
-                  )}
+                  <CardContent className="pt-0">
+                    <Select
+                      value={room.status}
+                      onValueChange={(val) => handleRoomStatusChange(room.id, val as Room['status'])}
+                      disabled={updatingRoom === room.id}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Available">Available</SelectItem>
+                        <SelectItem value="Occupied">Occupied</SelectItem>
+                        <SelectItem value="Cleaning">Cleaning</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -226,10 +251,6 @@ export const DashboardPage: React.FC = () => {
         </Tabs>
       </main>
 
-      {/* Mock Data Badge */}
-      <div className="fixed bottom-4 right-4 bg-yellow-100 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-md text-sm shadow-lg">
-        Using Mock Data
-      </div>
     </div>
   );
 };
