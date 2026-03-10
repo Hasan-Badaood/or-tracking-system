@@ -25,24 +25,36 @@ export interface StageDurationRow {
   sample_size: number;
 }
 
+export interface DateRangeRow {
+  date: string;
+  total: number;
+  completed: number;
+  active: number;
+}
+
 export const reportsAPI = {
   getDailySummary: async (date: string): Promise<DailySummary> => {
-    const response = await apiClient.get('/reports/daily-summary', {
-      params: { date },
-    });
+    const response = await apiClient.get('/reports/daily-summary', { params: { date } });
     const d = response.data;
-    return {
-      date: d.date,
-      summary: d.summary,
-      by_stage: d.by_stage,
-    };
+    return { date: d.date, summary: d.summary, by_stage: d.by_stage };
   },
 
   getStageDurations: async (startDate: string, endDate: string): Promise<StageDurationRow[]> => {
-    const response = await apiClient.get(
-      '/reports/stage-duration',
-      { params: { start_date: startDate, end_date: endDate } }
-    );
+    const response = await apiClient.get('/reports/stage-duration', {
+      params: { start_date: startDate, end_date: endDate },
+    });
     return response.data.durations ?? [];
+  },
+
+  getDateRange: async (startDate: string, endDate: string): Promise<DateRangeRow[]> => {
+    const response = await apiClient.get('/reports/date-range', {
+      params: { start_date: startDate, end_date: endDate },
+    });
+    return response.data.rows ?? [];
+  },
+
+  getNotificationConfig: async (): Promise<{ emailConfigured: boolean; smsConfigured: boolean }> => {
+    const response = await apiClient.get('/reports/notification-config');
+    return { emailConfigured: response.data.emailConfigured, smsConfigured: response.data.smsConfigured };
   },
 };
