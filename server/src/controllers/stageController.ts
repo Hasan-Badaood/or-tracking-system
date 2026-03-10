@@ -120,6 +120,19 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
 
     const fromStageId = visit.current_stage_id;
 
+    // If leaving "In Theatre" (no room explicitly set), free the current OR room
+    const fromStage = visit.get('current_stage') as any;
+    if (fromStage?.name === 'In Theatre' && toStage.name !== 'In Theatre' && visit.or_room_id) {
+      const prevRoom = await ORRoom.findByPk(visit.or_room_id, { transaction });
+      if (prevRoom) {
+        prevRoom.status = 'Cleaning';
+        prevRoom.current_visit_id = null;
+        prevRoom.last_status_change = new Date();
+        await prevRoom.save({ transaction });
+      }
+      visit.or_room_id = null;
+    }
+
     // Create stage event record
     const stageEvent = await StageEvent.create({
       visit_id: visit.id,
@@ -131,6 +144,12 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
 
     // Update visit current_stage_id
     visit.current_stage_id = to_stage_id;
+
+    // Auto-deactivate when discharged
+    if (toStage.name === 'Discharged') {
+      visit.active = false;
+    }
+
     await visit.save({ transaction });
 
     // Commit transaction
