@@ -100,8 +100,8 @@ const mapVisit = (data: any): Visit => ({
   family_contacts: data.family_contacts,
   active: data.active,
   notes: data.notes,
-  created_at: toUtc(data.created_at),
-  updated_at: toUtc(data.updated_at),
+  created_at: toUtc(data.created_at ?? data.createdAt),
+  updated_at: toUtc(data.updated_at ?? data.updatedAt),
 });
 
 export const visitsAPI = {
@@ -141,7 +141,7 @@ export const visitsAPI = {
       room: e.or_room,
       updated_by_user: e.updated_by_user,
       notes: e.notes,
-      created_at: toUtc(e.created_at),
+      created_at: toUtc(e.created_at ?? e.createdAt),
       duration_minutes: e.duration_minutes,
     }));
   },
@@ -167,5 +167,10 @@ export const visitsAPI = {
 
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/visits/${id}`);
+  },
+
+  notifyFamily: async (id: number): Promise<{ sent: { email: number; sms: number }; errors: string[]; config: { emailConfigured: boolean; smsConfigured: boolean } }> => {
+    const response = await apiClient.post(`/visits/${id}/notify`);
+    return response.data;
   },
 };
