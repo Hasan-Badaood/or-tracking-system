@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/api/auth';
-import { Loader2, Eye, EyeOff, ShieldCheck, Activity, Clock, Users } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Stethoscope, HeartPulse, KeyRound, UserCog } from 'lucide-react';
 
 const STATS = [
-  { icon: Activity, label: 'Live OR Monitoring', value: '24 / 7' },
-  { icon: Users,    label: 'Staff Roles Supported', value: '3' },
-  { icon: Clock,    label: 'Real-time Updates', value: '30s' },
-  { icon: ShieldCheck, label: 'Secure Access', value: 'OTP' },
+  { icon: HeartPulse,   label: 'Live OR Monitoring', value: '24 / 7' },
+  { icon: UserCog,      label: 'Staff Roles Supported', value: '3' },
+  { icon: Stethoscope,  label: 'Stage Transitions', value: '8' },
+  { icon: KeyRound,     label: 'Secure Access', value: 'OTP' },
 ];
 
 // Soft pulse rings in the background (purely decorative)
@@ -83,8 +83,10 @@ export const LoginPage: React.FC = () => {
         {/* Top: logo row */}
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/50">
-            <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
+            {/* Surgical cross small */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white">
+              <rect x="9.5" y="3" width="5" height="18" rx="1.2" />
+              <rect x="3" y="9.5" width="18" height="5" rx="1.2" />
             </svg>
           </div>
           <div>
@@ -102,8 +104,10 @@ export const LoginPage: React.FC = () => {
         {/* Centre: headline */}
         <div className="relative z-10 text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-2xl shadow-blue-900/60 mb-8">
-            <svg viewBox="0 0 24 24" fill="none" className="w-12 h-12 text-white" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            {/* Surgical cross */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-white">
+              <rect x="9" y="2" width="6" height="20" rx="1.5" />
+              <rect x="2" y="9" width="20" height="6" rx="1.5" />
             </svg>
           </div>
           <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight tracking-tight">
@@ -148,8 +152,9 @@ export const LoginPage: React.FC = () => {
           {/* Mobile-only logo */}
           <div className="lg:hidden flex items-center gap-2 mb-10 justify-center">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-white">
+                <rect x="9.5" y="3" width="5" height="18" rx="1.2" />
+                <rect x="3" y="9.5" width="18" height="5" rx="1.2" />
               </svg>
             </div>
             <span className="font-bold text-gray-900">OR Tracking System</span>
