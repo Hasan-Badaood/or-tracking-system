@@ -79,20 +79,17 @@ export const getVisits = async (req: Request, res: Response) => {
       };
     }
 
-    // Search in patient name or MRN or visit tracking ID
-    let patientWhere: any = {};
+    // Search across visit_tracking_id, patient name, and MRN using a flat OR
+    // so that a match on any one field is sufficient (avoids the INNER JOIN
+    // killing results when only the tracking ID matches).
     if (search) {
-      const searchTerm = `%${search}%`;
+      const s = `%${search}%`;
       where[Op.or] = [
-        { visit_tracking_id: { [Op.like]: searchTerm } }
+        { visit_tracking_id: { [Op.like]: s } },
+        { '$patient.first_name$': { [Op.like]: s } },
+        { '$patient.last_name$':  { [Op.like]: s } },
+        { '$patient.mrn$':        { [Op.like]: s } },
       ];
-      patientWhere = {
-        [Op.or]: [
-          { first_name: { [Op.like]: searchTerm } },
-          { last_name: { [Op.like]: searchTerm } },
-          { mrn: { [Op.like]: searchTerm } }
-        ]
-      };
     }
 
     // Calculate pagination
@@ -108,7 +105,6 @@ export const getVisits = async (req: Request, res: Response) => {
           model: Patient,
           as: 'patient',
           attributes: ['id', 'mrn', 'first_name', 'last_name', 'date_of_birth', 'gender'],
-          where: search ? patientWhere : undefined
         },
         {
           model: Stage,

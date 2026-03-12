@@ -85,6 +85,11 @@ export interface VisitsResponse {
   totalPages?: number;
 }
 
+// Ensure a timestamp string is treated as UTC so toLocaleTimeString()
+// shows the correct local wall-clock time.
+const toUtc = (ts: string): string =>
+  ts && !ts.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(ts) ? ts + 'Z' : ts;
+
 // Map the backend data format to the Visit interface
 const mapVisit = (data: any): Visit => ({
   id: data.id,
@@ -95,8 +100,8 @@ const mapVisit = (data: any): Visit => ({
   family_contacts: data.family_contacts,
   active: data.active,
   notes: data.notes,
-  created_at: data.created_at,
-  updated_at: data.updated_at,
+  created_at: toUtc(data.created_at),
+  updated_at: toUtc(data.updated_at),
 });
 
 export const visitsAPI = {
@@ -136,7 +141,7 @@ export const visitsAPI = {
       room: e.or_room,
       updated_by_user: e.updated_by_user,
       notes: e.notes,
-      created_at: e.created_at,
+      created_at: toUtc(e.created_at),
       duration_minutes: e.duration_minutes,
     }));
   },
