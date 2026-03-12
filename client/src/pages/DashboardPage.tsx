@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
+import { Navbar } from '@/components/layout/Navbar';
 import { VisitCard } from '@/components/VisitCard';
 import { CreateVisitForm } from '@/components/CreateVisitForm';
 import { Button } from '@/components/ui/button';
@@ -75,10 +75,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        title="OR Dashboard"
-        subtitle={`${visits.length} active patients • ${rooms.filter(r => r.status === 'Available').length} rooms available`}
-      />
+      <Navbar title="OR Dashboard" />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Stats */}

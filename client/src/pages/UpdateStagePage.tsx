@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { visitsAPI, Visit, TimelineEvent } from '@/api/visits';
 import { stagesAPI, Stage } from '@/api/stages';
 import { roomsAPI, Room } from '@/api/rooms';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { Navbar } from '@/components/layout/Navbar';
+import { Check, Loader2 } from 'lucide-react';
 
 export const UpdateStagePage: React.FC = () => {
   const navigate = useNavigate();
@@ -124,21 +125,7 @@ export const UpdateStagePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-slate-700 text-white px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-            className="text-white hover:bg-slate-600"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-bold">Update Patient Stage</h1>
-        </div>
-      </header>
+      <Navbar title="Update Stage" onBack={() => navigate(-1)} />
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">
         {error && (
