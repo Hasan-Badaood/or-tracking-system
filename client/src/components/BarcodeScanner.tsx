@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
-import { Button } from './ui/button';
-import { CameraOff, Loader2 } from 'lucide-react';
+import { Loader2, X, CameraOff } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (result: string) => void;
@@ -14,6 +13,20 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(true);
 
+  const stopCamera = () => {
+    readerRef.current?.reset();
+    // Explicitly stop all tracks so the camera light turns off immediately
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const handleClose = () => {
+    stopCamera();
+    onClose();
+  };
+
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
@@ -22,23 +35,21 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
       try {
         const devices = await reader.listVideoInputDevices();
         if (devices.length === 0) {
-          setError('No camera found on this device');
+          setError('No camera found on this device.');
           setStarting(false);
           return;
         }
 
-        const deviceId = devices[0].deviceId;
-
         await reader.decodeFromVideoDevice(
-          deviceId,
+          devices[0].deviceId,
           videoRef.current!,
           (result, err) => {
             if (result) {
+              stopCamera();
               onScan(result.getText());
             }
             if (err && !(err instanceof NotFoundException)) {
-              // NotFoundException fires every frame when no barcode is found — ignore it
-              console.warn('Barcode reader error:', err);
+              console.warn('Barcode reader:', err);
             }
           }
         );
@@ -46,9 +57,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
         setStarting(false);
       } catch (err: any) {
         if (err?.name === 'NotAllowedError') {
-          setError('Camera permission denied. Please allow camera access and try again.');
+          setError('Camera access was denied. Please allow camera permission and try again.');
         } else {
-          setError('Failed to start camera: ' + (err?.message ?? 'unknown error'));
+          setError('Could not start camera: ' + (err?.message ?? 'unknown error'));
         }
         setStarting(false);
       }
@@ -57,40 +68,69 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
     start();
 
     return () => {
-      reader.reset();
+      stopCamera();
     };
-  }, [onScan]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-slate-50 border border-slate-200 p-8 text-center h-56">
+        <CameraOff className="h-10 w-10 text-slate-400" />
+        <p className="text-sm text-red-500">{error}</p>
+        <button
+          onClick={handleClose}
+          className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      {error ? (
-        <div className="flex flex-col items-center justify-center gap-3 p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <CameraOff className="h-12 w-12 text-gray-400" />
-          <p className="text-sm text-red-600 text-center">{error}</p>
-          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
-        </div>
-      ) : (
-        <div className="relative rounded-lg overflow-hidden bg-black">
-          {starting && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50">
-              <Loader2 className="h-8 w-8 animate-spin text-white" />
-            </div>
-          )}
-          <video
-            ref={videoRef}
-            className="w-full max-h-64 object-cover"
-            autoPlay
-            playsInline
-            muted
-          />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="border-2 border-blue-400 rounded w-48 h-20 opacity-70" />
-          </div>
+    /* Fixed height so the card never jumps when the feed loads */
+    <div className="relative rounded-xl overflow-hidden bg-black h-56">
+      {/* Loading overlay */}
+      {starting && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/70">
+          <Loader2 className="h-7 w-7 animate-spin text-white" />
         </div>
       )}
-      <div className="flex justify-between items-center text-xs text-gray-500">
-        <span>Point camera at barcode</span>
-        <Button variant="ghost" size="sm" onClick={onClose}>Close Camera</Button>
+
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        autoPlay
+        playsInline
+        muted
+      />
+
+      {/* Scan guide box */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <div className="relative w-52 h-16">
+          {/* Corner marks */}
+          <span className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-blue-400 rounded-tl" />
+          <span className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-blue-400 rounded-tr" />
+          <span className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-blue-400 rounded-bl" />
+          <span className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-blue-400 rounded-br" />
+          {/* Scan line */}
+          <div className="absolute inset-x-0 top-1/2 h-px bg-blue-400/60" />
+        </div>
+      </div>
+
+      {/* Close button — always visible inside the frame */}
+      <button
+        onClick={handleClose}
+        className="absolute top-2.5 right-2.5 z-30 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors"
+        aria-label="Close camera"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+      {/* Bottom hint */}
+      <div className="absolute bottom-0 inset-x-0 z-10 py-2 px-3 bg-gradient-to-t from-black/60 to-transparent">
+        <p className="text-white/70 text-xs text-center">Point at a CODE128 barcode</p>
       </div>
     </div>
   );
