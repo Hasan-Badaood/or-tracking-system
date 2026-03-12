@@ -1,15 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { familyAPI, FamilyVisitStatus } from '@/api/family';
-import { Search, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 type PortalStep = 'search' | 'otp' | 'status';
 
-const STAGE_ORDER = ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre', 'In Theatre', 'Recovery', 'Discharged'];
+const STAGE_ORDER = [
+  'Arrived',
+  'Pre-Op Assessment',
+  'Ready for Theatre',
+  'In Theatre',
+  'Recovery',
+  'Discharged',
+];
+
+// Surgical cross — consistent with the login page logo
+const SurgicalCross: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <rect x="9.5" y="3" width="5" height="18" rx="1.2" />
+    <rect x="3" y="9.5" width="18" height="5" rx="1.2" />
+  </svg>
+);
 
 export const FamilyPortal: React.FC = () => {
   const [step, setStep] = useState<PortalStep>('search');
@@ -20,12 +30,15 @@ export const FamilyPortal: React.FC = () => {
   const [visitStatus, setVisitStatus] = useState<FamilyVisitStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     if (!accessToken) return;
     try {
       const data = await familyAPI.getVisitStatus(accessToken);
       setVisitStatus(data);
+      setLastRefreshed(new Date());
     } catch {
       // silently fail on refresh
     }
@@ -41,7 +54,6 @@ export const FamilyPortal: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       await familyAPI.requestOtp({
         visit_tracking_id: visitTrackingId,
@@ -49,7 +61,7 @@ export const FamilyPortal: React.FC = () => {
       });
       setStep('otp');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send OTP. Please check the Visit ID.');
+      setError(err.response?.data?.error || 'Could not find a visit with those details. Please check and try again.');
     } finally {
       setLoading(false);
     }
@@ -59,251 +71,328 @@ export const FamilyPortal: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       const data = await familyAPI.verifyOtp({ visit_tracking_id: visitTrackingId, otp });
       setAccessToken(data.access_token);
       setVisitStatus(data.visit);
+      setLastRefreshed(new Date());
       setStep('status');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid OTP. Please try again.');
+      setError(err.response?.data?.error || 'That code did not match. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const currentStageIdx = visitStatus
+    ? STAGE_ORDER.indexOf(visitStatus.current_stage.name)
+    : -1;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-800">Family Portal</h1>
-          <p className="text-gray-500 mt-2">Track your loved one's surgical journey</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+
+      {/* Top bar */}
+      <header className="bg-white border-b border-slate-200 px-5 py-4">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5 text-blue-600">
+            <SurgicalCross className="w-5 h-5" />
+            <span className="font-bold text-sm text-slate-800">OR Tracking</span>
+          </div>
+          <span className="text-xs text-slate-400 font-medium tracking-wide uppercase">Family Portal</span>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Step 1: Request OTP */}
-        {step === 'search' && (
-          <>
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Track Patient Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="visitId">Visit Tracking ID</Label>
-                    <Input
-                      id="visitId"
-                      value={visitTrackingId}
-                      onChange={(e) => setVisitTrackingId(e.target.value)}
-                      placeholder="e.g., VT-20260305-001"
-                      required
-                    />
+      <main className="flex-1 flex flex-col items-center justify-start px-4 py-10">
+        <div className="w-full max-w-md">
+
+          {/* ── Step 1: Find visit ── */}
+          {step === 'search' && (
+            <>
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-slate-900">Track your loved one</h1>
+                <p className="text-slate-500 text-sm mt-1.5">
+                  Enter the Visit ID given at registration and the email we have on file.
+                </p>
+              </div>
+
+              <form onSubmit={handleRequestOtp} className="space-y-5">
+                <div className="space-y-1.5">
+                  <label htmlFor="visitId" className="block text-sm font-semibold text-slate-700">
+                    Visit Tracking ID
+                  </label>
+                  <input
+                    id="visitId"
+                    type="text"
+                    value={visitTrackingId}
+                    onChange={(e) => setVisitTrackingId(e.target.value.toUpperCase())}
+                    placeholder="VT-20260305-001"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                  <p className="text-xs text-slate-400">Printed on the registration slip given at reception</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
+                      Email address
+                    </label>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email address (registered with the visit)</Label>
-                    <Input
+                  <div className="relative">
+                    <input
                       id="email"
-                      type="email"
+                      type={showEmail ? 'text' : 'email'}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="your@email.com"
+                      className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
-                    <p className="text-xs text-gray-500">
-                      Enter the email registered as a family contact for this visit
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmail((v) => !v)}
+                      tabIndex={-1}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {showEmail ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
-                  {error && (
-                    <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">{error}</div>
-                  )}
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending OTP...</>
-                    ) : (
-                      <><Search className="h-4 w-4 mr-2" /> Send OTP</>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6 text-center py-8">
-                <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">How to use this portal</h3>
-                <div className="text-gray-500 space-y-2 max-w-md mx-auto text-sm">
-                  <p>1. Enter the Visit Tracking ID provided at registration</p>
-                  <p>2. Provide the email registered with the patient's visit</p>
-                  <p>3. Enter the OTP sent to your email</p>
-                  <p>4. View real-time updates on your loved one's progress</p>
+                  <p className="text-xs text-slate-400">The email registered as a family contact</p>
                 </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
 
-        {/* Step 2: Enter OTP */}
-        {step === 'otp' && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Enter Verification Code</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
-                A 6-digit code has been sent to your email. It expires in 15 minutes.
-              </p>
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Verification Code</Label>
-                  <Input
+                {error && (
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending code...</>
+                  ) : (
+                    <>
+                      Send verification code
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Steps hint — inline, not a big card */}
+              <div className="mt-10 border-t border-slate-200 pt-7">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">How it works</p>
+                <ol className="space-y-3">
+                  {[
+                    'Enter the Visit ID from your registration slip',
+                    'We send a one-time code to your registered email',
+                    'Enter the code to view live stage updates',
+                  ].map((text, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-slate-500">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">
+                        {i + 1}
+                      </span>
+                      {text}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 2: OTP entry ── */}
+          {step === 'otp' && (
+            <>
+              <div className="mb-8">
+                <button
+                  type="button"
+                  onClick={() => { setStep('search'); setError(''); }}
+                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-5 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                  </svg>
+                  Back
+                </button>
+                <h1 className="text-2xl font-bold text-slate-900">Check your email</h1>
+                <p className="text-slate-500 text-sm mt-1.5">
+                  We sent a 6-digit code to <span className="font-medium text-slate-700">{email || 'your email'}</span>. It expires in 15 minutes.
+                </p>
+              </div>
+
+              <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <div className="space-y-1.5">
+                  <label htmlFor="otp" className="block text-sm font-semibold text-slate-700">
+                    Verification code
+                  </label>
+                  <input
                     id="otp"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit code"
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
                     maxLength={6}
                     required
-                    className="text-center text-xl tracking-widest"
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    className="w-full px-4 py-4 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-300 text-3xl font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
-                {error && (
-                  <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">{error}</div>
-                )}
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => { setStep('search'); setError(''); }}
-                    className="flex-1"
-                  >
-                    Back
-                  </Button>
-                  <Button type="submit" disabled={loading} className="flex-1">
-                    {loading ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
-                    ) : (
-                      'Verify'
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Step 3: Patient Status */}
-        {step === 'status' && visitStatus && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Patient: {visitStatus.patient_first_name}</CardTitle>
-                  <Badge
-                    className="text-base px-3 py-1 text-white"
+                {error && (
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || otp.length < 6}
+                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                  ) : (
+                    'Confirm code'
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRequestOtp}
+                  disabled={loading}
+                  className="w-full py-2.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  Resend code
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* ── Step 3: Live status ── */}
+          {step === 'status' && visitStatus && (
+            <>
+              {/* Patient banner */}
+              <div className="rounded-2xl bg-white border border-slate-200 p-5 mb-6 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Patient</p>
+                    <p className="text-xl font-bold text-slate-900">{visitStatus.patient_first_name}</p>
+                    <p className="text-xs text-slate-400 font-mono mt-1">{visitStatus.visit_tracking_id}</p>
+                  </div>
+                  <span
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white shrink-0 mt-1"
                     style={{ backgroundColor: visitStatus.current_stage.color }}
                   >
                     {visitStatus.current_stage.name}
-                  </Badge>
+                  </span>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">Visit ID</p>
-                  <p className="font-medium">{visitStatus.visit_tracking_id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Last Updated</p>
-                  <p className="font-medium">
-                    {new Date(visitStatus.updated_at).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Surgical Journey Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
+                {/* Thin progress bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+                    <span>Journey progress</span>
                     <span>{visitStatus.stage_progress_percent}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${visitStatus.stage_progress_percent}%` }}
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${visitStatus.stage_progress_percent}%`,
+                        backgroundColor: visitStatus.current_stage.color,
+                      }}
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-3">
-                  {STAGE_ORDER.map((stageName) => {
-                    const currentIdx = STAGE_ORDER.indexOf(visitStatus.current_stage.name);
-                    const stageIdx = STAGE_ORDER.indexOf(stageName);
-                    const isCompleted = stageIdx < currentIdx;
-                    const isCurrent = stageName === visitStatus.current_stage.name;
+              {/* Vertical timeline */}
+              <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm mb-4">
+                <p className="text-sm font-semibold text-slate-700 mb-5">Surgical stages</p>
+                <div className="relative">
+                  {/* Continuous vertical line */}
+                  <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-200" />
 
-                    return (
-                      <div
-                        key={stageName}
-                        className={`flex items-center gap-4 p-3 rounded-lg ${
-                          isCurrent
-                            ? 'bg-blue-50 border border-blue-200'
-                            : isCompleted
-                            ? 'bg-green-50'
-                            : 'bg-gray-50'
-                        }`}
-                      >
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            isCurrent
-                              ? 'bg-blue-600 text-white'
-                              : isCompleted
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-300 text-gray-600'
-                          }`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle className="h-5 w-5" />
-                          ) : (
-                            <Clock className="h-5 w-5" />
-                          )}
+                  <div className="space-y-0">
+                    {STAGE_ORDER.map((stageName, idx) => {
+                      const isCompleted = idx < currentStageIdx;
+                      const isCurrent = idx === currentStageIdx;
+                      const isPending = idx > currentStageIdx;
+
+                      return (
+                        <div key={stageName} className="flex items-start gap-4 relative py-3">
+                          {/* Node */}
+                          <div className="relative z-10 shrink-0">
+                            {isCompleted && (
+                              <div className="w-9 h-9 rounded-full bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center">
+                                <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              </div>
+                            )}
+                            {isCurrent && (
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: `${visitStatus.current_stage.color}15`, border: `2px solid ${visitStatus.current_stage.color}` }}>
+                                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: visitStatus.current_stage.color }} />
+                              </div>
+                            )}
+                            {isPending && (
+                              <div className="w-9 h-9 rounded-full bg-slate-50 border-2 border-slate-200 flex items-center justify-center">
+                                <span className="w-2 h-2 rounded-full bg-slate-300" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Label */}
+                          <div className="flex-1 pt-1.5">
+                            <p className={`text-sm font-medium leading-tight ${
+                              isCurrent ? 'text-slate-900' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
+                            }`}>
+                              {stageName}
+                            </p>
+                            {isCurrent && (
+                              <p className="text-xs mt-0.5" style={{ color: visitStatus.current_stage.color }}>
+                                In progress
+                              </p>
+                            )}
+                            {isCompleted && (
+                              <p className="text-xs text-emerald-500 mt-0.5">Completed</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className={`font-medium ${isCurrent ? 'text-blue-900' : ''}`}>
-                            {stageName}
-                          </p>
-                        </div>
-                        {isCurrent && <Badge>Current</Badge>}
-                        {isCompleted && <CheckCircle className="h-5 w-5 text-green-600" />}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="pt-6 flex gap-3 items-start">
-                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-                  <Clock className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium text-blue-900">Updates every minute</p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    This page refreshes automatically every 60 seconds.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              {/* Refresh notice */}
+              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                <span>
+                  {lastRefreshed
+                    ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Live'}
+                </span>
+                <span>Refreshes every 60 seconds</span>
+              </div>
+            </>
+          )}
+
+        </div>
       </main>
+
+      <footer className="text-center py-5 text-xs text-slate-300">
+        OR Patient Tracking System &mdash; For clinical staff access,{' '}
+        <a href="/login" className="text-blue-400 hover:text-blue-500">sign in here</a>
+      </footer>
     </div>
   );
 };
