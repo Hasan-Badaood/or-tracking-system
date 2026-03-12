@@ -6,8 +6,8 @@ type PortalStep = 'search' | 'otp' | 'status';
 
 const STAGE_ORDER = [
   'Arrived',
-  'Pre-Op Assessment',
-  'Ready for Theatre',
+  'Pre-Op',
+  'Ready',
   'In Theatre',
   'Recovery',
   'Discharged',
