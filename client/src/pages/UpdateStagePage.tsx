@@ -15,7 +15,7 @@ import { visitsAPI, Visit, TimelineEvent } from '@/api/visits';
 import { stagesAPI, Stage } from '@/api/stages';
 import { roomsAPI, Room } from '@/api/rooms';
 import { Navbar } from '@/components/layout/Navbar';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Bell } from 'lucide-react';
 
 export const UpdateStagePage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +33,9 @@ export const UpdateStagePage: React.FC = () => {
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [notes, setNotes] = useState('');
+  const [notifying, setNotifying] = useState(false);
+  const [notifyResult, setNotifyResult] = useState<{ email: number; sms: number } | null>(null);
+  const [notifyError, setNotifyError] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -77,6 +80,21 @@ export const UpdateStagePage: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update stage');
       setSaving(false);
+    }
+  };
+
+  const handleNotify = async () => {
+    if (!visit) return;
+    setNotifying(true);
+    setNotifyResult(null);
+    setNotifyError('');
+    try {
+      const result = await visitsAPI.notifyFamily(visit.id);
+      setNotifyResult(result.sent);
+    } catch (err: any) {
+      setNotifyError(err.response?.data?.error || 'Failed to send notifications');
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -290,31 +308,59 @@ export const UpdateStagePage: React.FC = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => navigate(-1)}
-            className="px-8 bg-gray-400 hover:bg-gray-500 text-white border-0"
-            disabled={saving}
-          >
-            CANCEL
-          </Button>
-          <Button
-            size="lg"
-            onClick={handleUpdate}
-            disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id}
-            className="px-8 bg-green-600 hover:bg-green-700 text-white"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              'UPDATE STAGE'
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Notify family */}
+          <div className="flex items-center gap-3">
+            {visit.family_contacts && visit.family_contacts.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleNotify}
+                disabled={notifying}
+                className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+              >
+                {notifying
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Bell className="h-4 w-4" />
+                }
+                Notify family
+              </Button>
             )}
-          </Button>
+            {notifyResult && (
+              <span className="text-sm text-emerald-600 font-medium">
+                Sent — {notifyResult.email} email{notifyResult.email !== 1 ? 's' : ''}, {notifyResult.sms} SMS
+              </span>
+            )}
+            {notifyError && (
+              <span className="text-sm text-red-500">{notifyError}</span>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => navigate(-1)}
+              className="px-8 bg-gray-400 hover:bg-gray-500 text-white border-0"
+              disabled={saving}
+            >
+              CANCEL
+            </Button>
+            <Button
+              size="lg"
+              onClick={handleUpdate}
+              disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id}
+              className="px-8 bg-green-600 hover:bg-green-700 text-white"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'UPDATE STAGE'
+              )}
+            </Button>
+          </div>
         </div>
       </main>
     </div>
