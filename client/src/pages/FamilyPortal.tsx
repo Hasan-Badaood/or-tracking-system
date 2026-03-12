@@ -13,12 +13,20 @@ const STAGE_ORDER = [
   'Discharged',
 ];
 
-// Surgical cross — consistent with the login page logo
 const SurgicalCross: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
     <rect x="9.5" y="3" width="5" height="18" rx="1.2" />
     <rect x="3" y="9.5" width="18" height="5" rx="1.2" />
   </svg>
+);
+
+const ErrorBox: React.FC<{ message: string }> = ({ message }) => (
+  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
+    {message}
+  </div>
 );
 
 export const FamilyPortal: React.FC = () => {
@@ -89,239 +97,273 @@ export const FamilyPortal: React.FC = () => {
     : -1;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-100 flex flex-col">
 
-      {/* Top bar */}
-      <header className="bg-white border-b border-slate-200 px-5 py-4">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-blue-600">
-            <SurgicalCross className="w-5 h-5" />
-            <span className="font-bold text-sm text-slate-800">OR Tracking</span>
-          </div>
-          <span className="text-xs text-slate-400 font-medium tracking-wide uppercase">Family Portal</span>
-        </div>
-      </header>
+      {/* ── Search step ── */}
+      {step === 'search' && (
+        <>
+          {/* Dark hero */}
+          <div className="relative bg-slate-950 overflow-hidden">
+            {/* Blobs */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-blue-600 opacity-10 blur-3xl" />
+              <div className="absolute bottom-0 right-0 w-56 h-56 rounded-full bg-indigo-600 opacity-10 blur-3xl" />
+            </div>
 
-      <main className="flex-1 flex flex-col items-center justify-start px-4 py-10">
-        <div className="w-full max-w-md">
-
-          {/* ── Step 1: Find visit ── */}
-          {step === 'search' && (
-            <>
-              <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900">Track your loved one</h1>
-                <p className="text-slate-500 text-sm mt-1.5">
-                  Enter the Visit ID given at registration and the email we have on file.
-                </p>
+            <div className="relative z-10 max-w-md mx-auto px-6 pt-10 pb-16">
+              {/* Logo row */}
+              <div className="flex items-center gap-2.5 mb-10">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                  <SurgicalCross className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-semibold text-sm">OR Tracking</span>
+                <span className="ml-auto text-xs text-slate-500 font-medium tracking-widest uppercase">Family</span>
               </div>
 
-              <form onSubmit={handleRequestOtp} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label htmlFor="visitId" className="block text-sm font-semibold text-slate-700">
-                    Visit Tracking ID
-                  </label>
-                  <input
-                    id="visitId"
-                    type="text"
-                    value={visitTrackingId}
-                    onChange={(e) => setVisitTrackingId(e.target.value.toUpperCase())}
-                    placeholder="VT-20260305-001"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                  <p className="text-xs text-slate-400">Printed on the registration slip given at reception</p>
-                </div>
+              <p className="text-blue-400 text-xs font-semibold tracking-widest uppercase mb-2">Patient tracker</p>
+              <h1 className="text-3xl font-bold text-white leading-tight">
+                Stay informed<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+                  every step of the way
+                </span>
+              </h1>
+              <p className="text-slate-400 text-sm mt-3 leading-relaxed">
+                Enter the Visit ID from your registration slip and your email to receive a secure access code.
+              </p>
+            </div>
+          </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+          {/* Form card — overlaps hero with negative top margin */}
+          <div className="flex-1 flex flex-col">
+            <div className="max-w-md mx-auto w-full px-4 -mt-6">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+                <form onSubmit={handleRequestOtp} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label htmlFor="visitId" className="block text-sm font-semibold text-slate-700">
+                      Visit Tracking ID
+                    </label>
+                    <input
+                      id="visitId"
+                      type="text"
+                      value={visitTrackingId}
+                      onChange={(e) => setVisitTrackingId(e.target.value.toUpperCase())}
+                      placeholder="VT-20260305-001"
+                      required
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
+                    />
+                    <p className="text-xs text-slate-400">Printed on the registration slip from reception</p>
+                  </div>
+
+                  <div className="space-y-1.5">
                     <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
                       Email address
                     </label>
+                    <div className="relative">
+                      <input
+                        id="email"
+                        type={showEmail ? 'text' : 'email'}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmail((v) => !v)}
+                        tabIndex={-1}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        {showEmail ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400">The email registered as a family contact</p>
                   </div>
-                  <div className="relative">
-                    <input
-                      id="email"
-                      type={showEmail ? 'text' : 'email'}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowEmail((v) => !v)}
-                      tabIndex={-1}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                      {showEmail ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-400">The email registered as a family contact</p>
-                </div>
 
-                {error && (
-                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
-                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {error}
-                  </div>
-                )}
+                  {error && <ErrorBox message={error} />}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending code...</>
-                  ) : (
-                    <>
-                      Send verification code
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                      </svg>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Steps hint — inline, not a big card */}
-              <div className="mt-10 border-t border-slate-200 pt-7">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">How it works</p>
-                <ol className="space-y-3">
-                  {[
-                    'Enter the Visit ID from your registration slip',
-                    'We send a one-time code to your registered email',
-                    'Enter the code to view live stage updates',
-                  ].map((text, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-slate-500">
-                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">
-                        {i + 1}
-                      </span>
-                      {text}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </>
-          )}
-
-          {/* ── Step 2: OTP entry ── */}
-          {step === 'otp' && (
-            <>
-              <div className="mb-8">
-                <button
-                  type="button"
-                  onClick={() => { setStep('search'); setError(''); }}
-                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-5 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                  </svg>
-                  Back
-                </button>
-                <h1 className="text-2xl font-bold text-slate-900">Check your email</h1>
-                <p className="text-slate-500 text-sm mt-1.5">
-                  We sent a 6-digit code to <span className="font-medium text-slate-700">{email || 'your email'}</span>. It expires in 15 minutes.
-                </p>
-              </div>
-
-              <form onSubmit={handleVerifyOtp} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label htmlFor="otp" className="block text-sm font-semibold text-slate-700">
-                    Verification code
-                  </label>
-                  <input
-                    id="otp"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000"
-                    maxLength={6}
-                    required
-                    autoComplete="one-time-code"
-                    inputMode="numeric"
-                    className="w-full px-4 py-4 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-300 text-3xl font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
-                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading || otp.length < 6}
-                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
-                  ) : (
-                    'Confirm code'
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRequestOtp}
-                  disabled={loading}
-                  className="w-full py-2.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
-                >
-                  Resend code
-                </button>
-              </form>
-            </>
-          )}
-
-          {/* ── Step 3: Live status ── */}
-          {step === 'status' && visitStatus && (
-            <>
-              {/* Patient banner */}
-              <div className="rounded-2xl bg-white border border-slate-200 p-5 mb-6 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Patient</p>
-                    <p className="text-xl font-bold text-slate-900">{visitStatus.patient_first_name}</p>
-                    <p className="text-xs text-slate-400 font-mono mt-1">{visitStatus.visit_tracking_id}</p>
-                  </div>
-                  <span
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white shrink-0 mt-1"
-                    style={{ backgroundColor: visitStatus.current_stage.color }}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 mt-1"
                   >
-                    {visitStatus.current_stage.name}
-                  </span>
-                </div>
+                    {loading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Sending code...</>
+                    ) : (
+                      <>
+                        Send verification code
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                </form>
 
-                {/* Thin progress bar */}
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs text-slate-400 mb-1.5">
-                    <span>Journey progress</span>
-                    <span>{visitStatus.stage_progress_percent}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{
-                        width: `${visitStatus.stage_progress_percent}%`,
-                        backgroundColor: visitStatus.current_stage.color,
-                      }}
-                    />
-                  </div>
+                <div className="mt-7 pt-6 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">How it works</p>
+                  <ol className="space-y-3">
+                    {[
+                      'Enter the Visit ID from your registration slip',
+                      'We send a one-time code to your registered email',
+                      'Enter the code to view live stage updates',
+                    ].map((text, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-slate-500">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">
+                          {i + 1}
+                        </span>
+                        {text}
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               </div>
 
-              {/* Vertical timeline */}
-              <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm mb-4">
-                <p className="text-sm font-semibold text-slate-700 mb-5">Surgical stages</p>
-                <div className="relative">
-                  {/* Continuous vertical line */}
-                  <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-200" />
+              <p className="text-center text-xs text-slate-400 mt-6 pb-8">
+                Clinical staff?{' '}
+                <a href="/login" className="text-blue-500 hover:text-blue-600 font-medium">Sign in here</a>
+              </p>
+            </div>
+          </div>
+        </>
+      )}
 
+      {/* ── OTP step ── */}
+      {step === 'otp' && (
+        <>
+          {/* Dark hero */}
+          <div className="relative bg-slate-950 overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-blue-600 opacity-10 blur-3xl" />
+            </div>
+            <div className="relative z-10 max-w-md mx-auto px-6 pt-10 pb-16">
+              <div className="flex items-center gap-2.5 mb-10">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                  <SurgicalCross className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-semibold text-sm">OR Tracking</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setStep('search'); setError(''); }}
+                className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-5 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                Back
+              </button>
+
+              <h1 className="text-3xl font-bold text-white">Check your email</h1>
+              <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                A 6-digit code was sent to{' '}
+                <span className="text-slate-200 font-medium">{email || 'your email'}</span>.
+                It expires in 15 minutes.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col">
+            <div className="max-w-md mx-auto w-full px-4 -mt-6">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label htmlFor="otp" className="block text-sm font-semibold text-slate-700">
+                      Verification code
+                    </label>
+                    <input
+                      id="otp"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      maxLength={6}
+                      required
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                      className="w-full px-4 py-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-300 text-3xl font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  {error && <ErrorBox message={error} />}
+
+                  <button
+                    type="submit"
+                    disabled={loading || otp.length < 6}
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                    ) : (
+                      'Confirm code'
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={loading}
+                    className="w-full py-2.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+                  >
+                    Resend code
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Status step ── */}
+      {step === 'status' && visitStatus && (
+        <>
+          {/* Dark hero — patient info */}
+          <div className="relative bg-slate-950 overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-indigo-600 opacity-10 blur-3xl" />
+            </div>
+            <div className="relative z-10 max-w-md mx-auto px-6 pt-10 pb-16">
+              <div className="flex items-center gap-2.5 mb-10">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                  <SurgicalCross className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-semibold text-sm">OR Tracking</span>
+                <span className="ml-auto text-xs text-slate-500 font-medium tracking-widest uppercase">Live</span>
+              </div>
+
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-widest mb-1">Patient</p>
+              <h1 className="text-3xl font-bold text-white">{visitStatus.patient_first_name}</h1>
+              <p className="text-slate-500 font-mono text-xs mt-1">{visitStatus.visit_tracking_id}</p>
+
+              <div className="mt-5 flex items-center justify-between">
+                <span
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
+                  style={{ backgroundColor: visitStatus.current_stage.color }}
+                >
+                  {visitStatus.current_stage.name}
+                </span>
+                <span className="text-slate-400 text-xs">{visitStatus.stage_progress_percent}% complete</span>
+              </div>
+
+              {/* Thin progress bar */}
+              <div className="mt-3 h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${visitStatus.stage_progress_percent}%`,
+                    backgroundColor: visitStatus.current_stage.color,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Timeline card */}
+          <div className="flex-1 flex flex-col">
+            <div className="max-w-md mx-auto w-full px-4 -mt-6 pb-8">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 mb-4">
+                <p className="text-sm font-semibold text-slate-700 mb-5">Surgical journey</p>
+                <div className="relative">
+                  <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-200" />
                   <div className="space-y-0">
                     {STAGE_ORDER.map((stageName, idx) => {
                       const isCompleted = idx < currentStageIdx;
@@ -330,7 +372,6 @@ export const FamilyPortal: React.FC = () => {
 
                       return (
                         <div key={stageName} className="flex items-start gap-4 relative py-3">
-                          {/* Node */}
                           <div className="relative z-10 shrink-0">
                             {isCompleted && (
                               <div className="w-9 h-9 rounded-full bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center">
@@ -340,8 +381,17 @@ export const FamilyPortal: React.FC = () => {
                               </div>
                             )}
                             {isCurrent && (
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: `${visitStatus.current_stage.color}15`, border: `2px solid ${visitStatus.current_stage.color}` }}>
-                                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: visitStatus.current_stage.color }} />
+                              <div
+                                className="w-9 h-9 rounded-full flex items-center justify-center"
+                                style={{
+                                  backgroundColor: `${visitStatus.current_stage.color}18`,
+                                  border: `2px solid ${visitStatus.current_stage.color}`,
+                                }}
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full animate-pulse"
+                                  style={{ backgroundColor: visitStatus.current_stage.color }}
+                                />
                               </div>
                             )}
                             {isPending && (
@@ -351,10 +401,13 @@ export const FamilyPortal: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Label */}
                           <div className="flex-1 pt-1.5">
                             <p className={`text-sm font-medium leading-tight ${
-                              isCurrent ? 'text-slate-900' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
+                              isCurrent
+                                ? 'text-slate-900'
+                                : isCompleted
+                                ? 'text-emerald-700'
+                                : 'text-slate-400'
                             }`}>
                               {stageName}
                             </p>
@@ -374,25 +427,19 @@ export const FamilyPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Refresh notice */}
               <div className="flex items-center justify-between text-xs text-slate-400 px-1">
                 <span>
                   {lastRefreshed
                     ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                     : 'Live'}
                 </span>
-                <span>Refreshes every 60 seconds</span>
+                <span>Auto-refreshes every 60 s</span>
               </div>
-            </>
-          )}
+            </div>
+          </div>
+        </>
+      )}
 
-        </div>
-      </main>
-
-      <footer className="text-center py-5 text-xs text-slate-300">
-        OR Patient Tracking System &mdash; For clinical staff access,{' '}
-        <a href="/login" className="text-blue-400 hover:text-blue-500">sign in here</a>
-      </footer>
     </div>
   );
 };
