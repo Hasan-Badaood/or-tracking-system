@@ -9,7 +9,7 @@ import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { visitsAPI, Visit } from '@/api/visits';
 import { roomsAPI, Room } from '@/api/rooms';
-import { authAPI } from '@/api/auth';
+import { Navbar } from '@/components/layout/Navbar';
 import { Camera, Loader2 } from 'lucide-react';
 
 export const NurseDashboard: React.FC = () => {
@@ -22,8 +22,6 @@ export const NurseDashboard: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [updatingRoom, setUpdatingRoom] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-
   const fetchVisits = useCallback(async () => {
     try {
       const data = await visitsAPI.getAll({ active: true, limit: 100 });
@@ -63,17 +61,6 @@ export const NurseDashboard: React.FC = () => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      await authAPI.logout();
-    } catch {
-      // ignore
-    }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
 
   const handleSearch = () => {
     if (visitId.trim()) {
@@ -118,22 +105,7 @@ export const NurseDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-slate-700 text-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Nurse Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm">{user.name || 'Nurse'} | Nurse</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navbar title="Nurse Station" />
 
       <main className="p-6 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

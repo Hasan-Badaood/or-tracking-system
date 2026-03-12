@@ -7,9 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { visitsAPI, Visit } from '@/api/visits';
-import { authAPI } from '@/api/auth';
 import { CreateVisitForm } from '@/components/CreateVisitForm';
 import { printBarcode } from '@/lib/printBarcode';
+import { Navbar } from '@/components/layout/Navbar';
 import { Search, Printer, Eye, Check, X, Loader2 } from 'lucide-react';
 
 export const ReceptionDashboard: React.FC = () => {
@@ -18,8 +18,6 @@ export const ReceptionDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-
   const fetchVisits = useCallback(async () => {
     try {
       const data = await visitsAPI.getAll({
@@ -43,17 +41,6 @@ export const ReceptionDashboard: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleLogout = async () => {
-    try {
-      await authAPI.logout();
-    } catch {
-      // ignore errors on logout
-    }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
-
   const handleCreateSuccess = () => {
     setShowCreateForm(false);
     fetchVisits();
@@ -67,23 +54,7 @@ export const ReceptionDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-slate-700 text-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Reception Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm">{user.name || 'Reception'} | Reception</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navbar title="Reception" />
 
       <main className="p-6 space-y-6">
         {/* Stats and New Visit Button */}
