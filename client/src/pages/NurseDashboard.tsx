@@ -95,25 +95,25 @@ export const NurseDashboard: React.FC = () => {
     <div className="min-h-screen bg-slate-100">
       <Navbar title="Nurse Station" />
 
-      <main className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
+      <main className="p-3 sm:p-5 space-y-4 max-w-7xl mx-auto">
 
         {/* ── Stats strip ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Active patients', value: visits.length, color: 'text-blue-600' },
-            { label: 'In theatre',      value: inTheatre,     color: 'text-red-600' },
-            { label: 'In recovery',     value: inRecovery,    color: 'text-purple-600' },
+            { label: 'Active patients', value: visits.length,  color: 'text-blue-600' },
+            { label: 'In theatre',      value: inTheatre,      color: 'text-red-600' },
+            { label: 'In recovery',     value: inRecovery,     color: 'text-purple-600' },
             { label: 'Rooms free',      value: availableRooms, color: 'text-emerald-600' },
           ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
-              <p className={`text-3xl font-bold ${color}`}>{loadingVisits && label !== 'Rooms free' ? '—' : value}</p>
-              <p className="text-slate-500 text-xs mt-1">{label}</p>
+            <div key={label} className="bg-white rounded-xl border border-slate-200 px-4 py-3.5 shadow-sm">
+              <p className={`text-2xl sm:text-3xl font-bold ${color}`}>{loadingVisits && label !== 'Rooms free' ? '—' : value}</p>
+              <p className="text-slate-500 text-xs mt-0.5">{label}</p>
             </div>
           ))}
         </div>
 
         {/* ── Scan + Rooms row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Scan card */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -131,7 +131,7 @@ export const NurseDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
-                  className="w-full h-56 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-400 transition-colors flex flex-col items-center justify-center gap-3 group"
+                  className="w-full h-44 sm:h-52 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-400 transition-colors flex flex-col items-center justify-center gap-3 group"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
                     <Camera className="h-7 w-7 text-slate-400 group-hover:text-blue-500 transition-colors" />
@@ -179,7 +179,7 @@ export const NurseDashboard: React.FC = () => {
                   <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {rooms.map((room) => {
                     const style = ROOM_STATUS_STYLES[room.status] ?? ROOM_STATUS_STYLES.Maintenance;
                     return (
@@ -246,35 +246,35 @@ export const NurseDashboard: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Visit ID</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Patient</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Stage</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Room</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Time in stage</th>
-                    <th className="px-5 py-3" />
+                    <th className="hidden sm:table-cell text-left px-4 sm:px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Visit ID</th>
+                    <th className="text-left px-4 sm:px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Patient</th>
+                    <th className="text-left px-4 sm:px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Stage</th>
+                    <th className="hidden md:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Room</th>
+                    <th className="hidden md:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Time</th>
+                    <th className="px-4 sm:px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {visits.map((visit) => (
                     <tr key={visit.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3.5 font-mono text-xs text-slate-600">{visit.visit_tracking_id}</td>
-                      <td className="px-5 py-3.5 font-medium text-slate-800">
+                      <td className="hidden sm:table-cell px-4 sm:px-5 py-3 font-mono text-xs text-slate-500">{visit.visit_tracking_id}</td>
+                      <td className="px-4 sm:px-5 py-3 font-medium text-slate-800 text-sm">
                         {visit.patient.first_name} {visit.patient.last_name.charAt(0)}.
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 sm:px-5 py-3">
                         <Badge
-                          className="text-white text-xs font-medium px-2.5 py-0.5"
+                          className="text-white text-xs font-medium px-2 py-0.5 whitespace-nowrap"
                           style={{ backgroundColor: visit.current_stage.color }}
                         >
                           {visit.current_stage.name}
                         </Badge>
                       </td>
-                      <td className="px-5 py-3.5 text-slate-500">{visit.or_room?.name || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-5 py-3.5 text-slate-500 tabular-nums">{getTimeInStage(visit.updated_at)}</td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td className="hidden md:table-cell px-5 py-3 text-slate-500 text-sm">{visit.or_room?.name || <span className="text-slate-300">—</span>}</td>
+                      <td className="hidden md:table-cell px-5 py-3 text-slate-500 tabular-nums text-sm">{getTimeInStage(visit.updated_at)}</td>
+                      <td className="px-4 sm:px-5 py-3 text-right">
                         <button
                           onClick={() => navigate(`/update-stage?visitId=${visit.visit_tracking_id}`)}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors whitespace-nowrap"
                         >
                           Update
                         </button>
