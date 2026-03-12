@@ -8,16 +8,21 @@ interface BarcodeScannerProps {
 }
 
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef  = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const [error, setError] = useState('');
+  // Captured independently so we always have a reference regardless of what
+  // zxing does with videoRef.srcObject internally.
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [error,    setError]    = useState('');
   const [starting, setStarting] = useState(true);
 
+  /** Hard-stop: kills the decode loop AND releases the camera hardware. */
   const stopCamera = () => {
-    readerRef.current?.reset();
-    // Explicitly stop all tracks so the camera light turns off immediately
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+    try { readerRef.current?.reset(); } catch { /* ignore */ }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
   };
@@ -44,6 +49,10 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
           devices[0].deviceId,
           videoRef.current!,
           (result, err) => {
+            // Grab the stream reference as soon as the video is live
+            if (!streamRef.current && videoRef.current?.srcObject instanceof MediaStream) {
+              streamRef.current = videoRef.current.srcObject;
+            }
             if (result) {
               stopCamera();
               onScan(result.getText());
@@ -53,6 +62,11 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
             }
           }
         );
+
+        // Also capture immediately after decodeFromVideoDevice resolves
+        if (videoRef.current?.srcObject instanceof MediaStream) {
+          streamRef.current = videoRef.current.srcObject;
+        }
 
         setStarting(false);
       } catch (err: any) {
@@ -67,15 +81,14 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
 
     start();
 
-    return () => {
-      stopCamera();
-    };
+    // Cleanup on unmount — guaranteed to fire even if handleClose already ran
+    return () => { stopCamera(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-slate-50 border border-slate-200 p-8 text-center h-56">
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-slate-50 border border-slate-200 p-8 text-center h-44 sm:h-52">
         <CameraOff className="h-10 w-10 text-slate-400" />
         <p className="text-sm text-red-500">{error}</p>
         <button
@@ -89,8 +102,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   }
 
   return (
-    /* Fixed height so the card never jumps when the feed loads */
-    <div className="relative rounded-xl overflow-hidden bg-black h-56">
+    <div className="relative rounded-xl overflow-hidden bg-black h-44 sm:h-52">
       {/* Loading overlay */}
       {starting && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/70">
@@ -106,20 +118,18 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
         muted
       />
 
-      {/* Scan guide box */}
+      {/* Scan guide */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
         <div className="relative w-52 h-16">
-          {/* Corner marks */}
           <span className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-blue-400 rounded-tl" />
           <span className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-blue-400 rounded-tr" />
           <span className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-blue-400 rounded-bl" />
           <span className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-blue-400 rounded-br" />
-          {/* Scan line */}
           <div className="absolute inset-x-0 top-1/2 h-px bg-blue-400/60" />
         </div>
       </div>
 
-      {/* Close button — always visible inside the frame */}
+      {/* Close button */}
       <button
         onClick={handleClose}
         className="absolute top-2.5 right-2.5 z-30 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors"
