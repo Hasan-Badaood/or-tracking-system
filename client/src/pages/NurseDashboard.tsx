@@ -80,6 +80,7 @@ export const NurseDashboard: React.FC = () => {
 
   const getTimeInStage = (updatedAt: string) => {
     const minutes = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 60000);
+    if (!isFinite(minutes) || minutes < 0) return '—';
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -88,7 +89,7 @@ export const NurseDashboard: React.FC = () => {
 
   const inTheatre  = visits.filter((v) => v.current_stage.name === 'In Theatre').length;
   const inRecovery = visits.filter((v) => v.current_stage.name === 'Recovery').length;
-  const preOp      = visits.filter((v) => ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre'].includes(v.current_stage.name)).length;
+  const preOp      = visits.filter((v) => ['Arrived', 'Pre-Op', 'Ready'].includes(v.current_stage.name)).length;
   const availableRooms = rooms.filter((r) => r.status === 'Available').length;
 
   return (

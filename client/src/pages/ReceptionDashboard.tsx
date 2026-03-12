@@ -41,7 +41,7 @@ export const ReceptionDashboard: React.FC = () => {
   };
 
   const totalVisits  = visits.length;
-  const arrived      = visits.filter((v) => ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre'].includes(v.current_stage.name)).length;
+  const arrived      = visits.filter((v) => ['Arrived', 'Pre-Op', 'Ready'].includes(v.current_stage.name)).length;
   const inSurgery    = visits.filter((v) => v.current_stage.name === 'In Theatre').length;
   const withFamily   = visits.filter((v) => v.family_contacts && v.family_contacts.length > 0).length;
 
