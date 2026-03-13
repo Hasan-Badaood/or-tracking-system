@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { Visit, Patient, Stage, ORRoom, User, FamilyContact } from '../models';
+import { notifyFamilyContacts, notificationConfig } from '../services/notificationService';
 
 interface AuthRequest extends Request {
   user?: {
@@ -79,20 +80,17 @@ export const getVisits = async (req: Request, res: Response) => {
       };
     }
 
-    // Search in patient name or MRN or visit tracking ID
-    let patientWhere: any = {};
+    // Search across visit_tracking_id, patient name, and MRN using a flat OR
+    // so that a match on any one field is sufficient (avoids the INNER JOIN
+    // killing results when only the tracking ID matches).
     if (search) {
-      const searchTerm = `%${search}%`;
+      const s = `%${search}%`;
       where[Op.or] = [
-        { visit_tracking_id: { [Op.like]: searchTerm } }
+        { visit_tracking_id: { [Op.like]: s } },
+        { '$patient.first_name$': { [Op.like]: s } },
+        { '$patient.last_name$':  { [Op.like]: s } },
+        { '$patient.mrn$':        { [Op.like]: s } },
       ];
-      patientWhere = {
-        [Op.or]: [
-          { first_name: { [Op.like]: searchTerm } },
-          { last_name: { [Op.like]: searchTerm } },
-          { mrn: { [Op.like]: searchTerm } }
-        ]
-      };
     }
 
     // Calculate pagination
@@ -108,7 +106,6 @@ export const getVisits = async (req: Request, res: Response) => {
           model: Patient,
           as: 'patient',
           attributes: ['id', 'mrn', 'first_name', 'last_name', 'date_of_birth', 'gender'],
-          where: search ? patientWhere : undefined
         },
         {
           model: Stage,
@@ -183,10 +180,10 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
 
     const { mrn, first_name, last_name, date_of_birth, gender } = patient;
 
-    if (!mrn || !first_name || !last_name || !date_of_birth || !gender) {
+    if (!mrn || !first_name || !last_name) {
       return res.status(400).json({
         success: false,
-        error: 'Patient mrn, first_name, last_name, date_of_birth, and gender are required'
+        error: 'Patient mrn, first_name, and last_name are required'
       });
     }
 
@@ -508,6 +505,52 @@ export const updateVisit = async (req: AuthRequest, res: Response) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+};
+
+// POST /visits/:id/notify - Manually send notification to family contacts
+export const notifyFamily = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const visit = await Visit.findByPk(req.params.id, {
+      include: [
+        { model: Patient, as: 'patient', attributes: ['first_name', 'last_name'] },
+        { model: Stage, as: 'current_stage', attributes: ['name'] },
+        { model: FamilyContact, as: 'family_contacts', where: { consent_given: true }, required: false },
+      ],
+    });
+
+    if (!visit) {
+      return res.status(404).json({ success: false, error: 'Visit not found' });
+    }
+
+    const contacts = (visit.get('family_contacts') as any[]) ?? [];
+    if (contacts.length === 0) {
+      return res.status(400).json({ success: false, error: 'No family contacts with consent found' });
+    }
+
+    const patient = visit.get('patient') as any;
+    const stage = visit.get('current_stage') as any;
+
+    const result = await notifyFamilyContacts(contacts, {
+      patientName: `${patient.first_name} ${patient.last_name}`,
+      stageName: stage.name,
+      visitTrackingId: visit.visit_tracking_id,
+      timestamp: new Date(),
+    });
+
+    res.json({
+      success: true,
+      sent: { email: result.email, sms: result.sms },
+      errors: result.errors,
+      config: notificationConfig,
+    });
+  } catch (error) {
+    console.error('Notify family error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
