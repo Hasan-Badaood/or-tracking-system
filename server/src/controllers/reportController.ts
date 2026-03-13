@@ -40,9 +40,10 @@ export const getDailySummary = async (req: Request, res: Response) => {
 
     // Calculate average duration
     const durations = visits.map(v => {
-      const created = new Date(v.created_at).getTime();
-      const updated = new Date(v.updated_at).getTime();
-      return Math.floor((updated - created) / 60000);
+      const created = new Date(v.created_at ?? 0).getTime();
+      const updated = new Date(v.updated_at ?? v.created_at ?? 0).getTime();
+      const diff = Math.floor((updated - created) / 60000);
+      return isFinite(diff) ? diff : 0;
     });
     const averageDuration = durations.length > 0
       ? Math.floor(durations.reduce((a, b) => a + b, 0) / durations.length)
@@ -57,10 +58,10 @@ export const getDailySummary = async (req: Request, res: Response) => {
       if (!stageGroups.has(stage.name)) {
         stageGroups.set(stage.name, []);
       }
-      const created = new Date(v.created_at).getTime();
-      const updated = new Date(v.updated_at).getTime();
+      const created = new Date(v.created_at ?? 0).getTime();
+      const updated = new Date(v.updated_at ?? v.created_at ?? 0).getTime();
       const duration = Math.floor((updated - created) / 60000);
-      stageGroups.get(stage.name)!.push(duration);
+      if (isFinite(duration)) stageGroups.get(stage.name)!.push(duration);
     });
 
     stageGroups.forEach((durations, stageName) => {
@@ -87,7 +88,7 @@ export const getDailySummary = async (req: Request, res: Response) => {
         active_visits: activeVisits,
         cancelled_visits: 0,
         average_duration_minutes: averageDuration,
-        or_utilization_rate: parseFloat(utilizationRate.toFixed(1))
+        or_utilization_rate: parseFloat(utilizationRate.toFixed(1)) || 0
       },
       by_stage: byStage
     });
@@ -97,6 +98,57 @@ export const getDailySummary = async (req: Request, res: Response) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+};
+
+// GET /reports/date-range - Daily visit totals over a date range
+export const getDateRange = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date } = req.query;
+    if (!start_date || !end_date) {
+      return res.status(400).json({ success: false, error: 'start_date and end_date are required' });
+    }
+
+    const start = new Date(start_date as string);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(end_date as string);
+    end.setHours(23, 59, 59, 999);
+
+    const visits = await Visit.findAll({
+      where: { created_at: { [Op.gte]: start, [Op.lte]: end } },
+      include: [{ model: Stage, as: 'current_stage', attributes: ['name'] }],
+    });
+
+    // Build a map of date → counts
+    const byDate = new Map<string, { total: number; completed: number; active: number }>();
+
+    // Pre-fill every day in range so gaps show as 0
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      byDate.set(d.toISOString().split('T')[0], { total: 0, completed: 0, active: 0 });
+    }
+
+    visits.forEach((v) => {
+      const ts = v.created_at;
+      if (!ts) return;
+      const d = new Date(ts);
+      if (!isFinite(d.getTime())) return;
+      const dateKey = d.toISOString().split('T')[0];
+      const entry = byDate.get(dateKey);
+      if (!entry) return;
+      entry.total++;
+      const stageName = (v.get('current_stage') as any)?.name;
+      if (stageName === 'Discharged') entry.completed++;
+      else entry.active++;
+    });
+
+    const rows = Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({ date, ...counts }));
+
+    res.json({ success: true, rows });
+  } catch (error) {
+    console.error('Get date range error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
@@ -185,7 +237,7 @@ export const getStageDuration = async (req: Request, res: Response) => {
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0]
       },
-      stage_durations: results
+      durations: results
     });
   } catch (error) {
     console.error('Get stage duration error:', error);

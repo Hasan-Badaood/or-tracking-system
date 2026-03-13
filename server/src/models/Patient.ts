@@ -6,8 +6,8 @@ export class Patient extends Model {
   public mrn!: string;
   public first_name!: string;
   public last_name!: string;
-  public date_of_birth!: Date;
-  public gender!: string;
+  public date_of_birth!: Date | null;
+  public gender!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -33,11 +33,11 @@ Patient.init({
   },
   date_of_birth: {
     type: DataTypes.DATEONLY,
-    allowNull: false
+    allowNull: true
   },
   gender: {
     type: DataTypes.ENUM('male', 'female', 'other'),
-    allowNull: false
+    allowNull: true
   }
 }, {
   sequelize,

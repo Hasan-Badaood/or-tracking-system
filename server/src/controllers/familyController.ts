@@ -1,15 +1,8 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import crypto from 'crypto';
 import { Visit, FamilyContact, FamilyToken, Patient, Stage } from '../models';
 import { sendOTPEmail } from '../lib/mailer';
-
-interface FamilyAuthRequest extends Request {
-  familyToken?: {
-    id: number;
-    visit_id: number;
-    family_contact_id: number;
-  };
-}
 
 // Helper to generate 6-digit OTP
 const generateOTP = (): string => {
@@ -21,39 +14,57 @@ const generateFamilyToken = (): string => {
   return 'fam_' + crypto.randomBytes(16).toString('hex');
 };
 
+const STAGE_ORDER = ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre', 'In Theatre', 'Recovery', 'Discharged'];
+
 // POST /family/request-otp - Request OTP for family access
 export const requestOTP = async (req: Request, res: Response) => {
   try {
-    const { phone, visit_tracking_id } = req.body;
+    const { visit_tracking_id, email, phone } = req.body;
 
-    if (!phone || !visit_tracking_id) {
+    if (!visit_tracking_id) {
       return res.status(400).json({
         success: false,
-        error: 'Phone number and visit tracking ID are required'
+        error: 'visit_tracking_id is required'
       });
     }
 
-    // Find visit with family contact
+    if (!email && !phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email or phone is required'
+      });
+    }
+
+    // Find the visit
     const visit = await Visit.findOne({
-      where: { visit_tracking_id, active: true },
-      include: [
-        {
-          model: FamilyContact,
-          as: 'family_contacts',
-          where: { phone }
-        }
-      ]
+      where: { visit_tracking_id, active: true }
     });
 
     if (!visit) {
       return res.status(404).json({
         success: false,
-        error: 'Visit not found or no family contact registered'
+        error: 'Visit not found or no longer active'
       });
     }
 
-    const familyContacts = visit.get('family_contacts') as any[];
-    const familyContact = familyContacts[0];
+    // Find family contact for this visit
+    const contactWhere: any = { visit_id: visit.id };
+    if (email) {
+      contactWhere.email = email;
+    } else if (phone) {
+      contactWhere.phone = phone;
+    }
+
+    const familyContact = await FamilyContact.findOne({
+      where: contactWhere
+    });
+
+    if (!familyContact) {
+      return res.status(404).json({
+        success: false,
+        error: 'No family contact found with these details for this visit'
+      });
+    }
 
     if (!familyContact.consent_given) {
       return res.status(403).json({
@@ -67,7 +78,7 @@ export const requestOTP = async (req: Request, res: Response) => {
     const recentTokens = await FamilyToken.count({
       where: {
         family_contact_id: familyContact.id,
-        created_at: { $gte: oneHourAgo }
+        created_at: { [Op.gte]: oneHourAgo }
       }
     });
 
@@ -84,7 +95,6 @@ export const requestOTP = async (req: Request, res: Response) => {
     const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create family token record
     await FamilyToken.create({
       family_contact_id: familyContact.id,
       visit_id: visit.id,
@@ -96,22 +106,22 @@ export const requestOTP = async (req: Request, res: Response) => {
       is_locked: false
     });
 
-    const deliveryMethod = familyContact.email ? 'email' : 'sms';
-    const maskedRecipient = familyContact.email
-      ? familyContact.email.replace(/(.{1}).*(@.*)/, '$1***$2')
-      : phone.replace(/(\+\d{3})\d+(\d{3})/, '$1***$2');
-
-    if (deliveryMethod === 'email' && familyContact.email) {
-      await sendOTPEmail(familyContact.email, otp, 'your relative');
+    const recipientEmail = familyContact.email;
+    if (recipientEmail) {
+      await sendOTPEmail(recipientEmail, otp, 'your relative');
     } else {
-      // SMS gateway not yet integrated — log for development
-      console.log(`[DEV] OTP SMS to ${phone}: ${otp}`);
+      // SMS not yet integrated
+      console.log(`[DEV] OTP SMS to ${familyContact.phone}: ${otp}`);
     }
+
+    const maskedRecipient = recipientEmail
+      ? recipientEmail.replace(/(.{1}).*(@.*)/, '$1***$2')
+      : familyContact.phone.replace(/(\d{3})\d+(\d{3})/, '$1***$2');
 
     res.json({
       success: true,
       message: 'OTP sent successfully',
-      delivery_method: deliveryMethod,
+      delivery_method: recipientEmail ? 'email' : 'sms',
       masked_recipient: maskedRecipient,
       expires_in_minutes: 15
     });
@@ -127,46 +137,43 @@ export const requestOTP = async (req: Request, res: Response) => {
 // POST /family/verify-otp - Verify OTP and get access token
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
-    const { phone, otp } = req.body;
+    const { visit_tracking_id, otp } = req.body;
 
-    if (!phone || !otp) {
+    if (!visit_tracking_id || !otp) {
       return res.status(400).json({
         success: false,
-        error: 'Phone number and OTP are required'
+        error: 'visit_tracking_id and otp are required'
       });
     }
 
-    // Find family contact
-    const familyContact = await FamilyContact.findOne({
-      where: { phone }
-    });
-
-    if (!familyContact) {
-      return res.status(404).json({
-        success: false,
-        error: 'Family contact not found'
-      });
-    }
-
-    // Find the most recent token
-    const familyToken = await FamilyToken.findOne({
-      where: {
-        family_contact_id: familyContact.id
-      },
-      order: [['created_at', 'DESC']],
+    // Find the visit
+    const visit = await Visit.findOne({
+      where: { visit_tracking_id },
       include: [
         {
-          model: Visit,
-          as: 'visit',
-          include: [
-            {
-              model: Patient,
-              as: 'patient',
-              attributes: ['first_name']
-            }
-          ]
+          model: Patient,
+          as: 'patient',
+          attributes: ['first_name']
+        },
+        {
+          model: Stage,
+          as: 'current_stage',
+          attributes: ['name', 'color']
         }
       ]
+    });
+
+    if (!visit) {
+      return res.status(404).json({
+        success: false,
+        error: 'Visit not found'
+      });
+    }
+
+    // Find the most recent token for this visit
+    const familyToken = await FamilyToken.findOne({
+      where: { visit_id: visit.id },
+      order: [['created_at', 'DESC']]
     });
 
     if (!familyToken) {
@@ -184,20 +191,18 @@ export const verifyOTP = async (req: Request, res: Response) => {
           success: false,
           error: 'Too many failed attempts. Account locked for 30 minutes.'
         });
-      } else {
-        // Unlock if time has passed
-        familyToken.is_locked = false;
-        familyToken.locked_until = null;
-        familyToken.otp_attempts = 0;
-        await familyToken.save();
       }
+      familyToken.is_locked = false;
+      familyToken.locked_until = null;
+      familyToken.otp_attempts = 0;
+      await familyToken.save();
     }
 
     // Check if OTP expired
     if (new Date() > familyToken.otp_expires_at) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid or expired OTP'
+        error: 'OTP has expired. Please request a new one.'
       });
     }
 
@@ -207,7 +212,7 @@ export const verifyOTP = async (req: Request, res: Response) => {
 
       if (familyToken.otp_attempts >= 3) {
         familyToken.is_locked = true;
-        familyToken.locked_until = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+        familyToken.locked_until = new Date(Date.now() + 30 * 60 * 1000);
         await familyToken.save();
 
         return res.status(423).json({
@@ -220,25 +225,35 @@ export const verifyOTP = async (req: Request, res: Response) => {
 
       return res.status(401).json({
         success: false,
-        error: 'Invalid or expired OTP',
+        error: 'Invalid OTP',
         attempts_remaining: 3 - familyToken.otp_attempts
       });
     }
 
-    // OTP is valid - reset attempts
+    // OTP valid - reset attempts
     familyToken.otp_attempts = 0;
     await familyToken.save();
 
-    const visit = familyToken.get('visit') as any;
-    const patient = visit.patient;
+    const patient = visit.get('patient') as any;
+    const currentStage = visit.get('current_stage') as any;
+    const currentIndex = STAGE_ORDER.indexOf(currentStage.name);
+    const stageProgressPercent = currentIndex >= 0
+      ? Math.round(((currentIndex + 1) / STAGE_ORDER.length) * 100)
+      : 0;
 
     res.json({
       success: true,
-      token: familyToken.token,
+      access_token: familyToken.token,
       expires_at: familyToken.token_expires_at,
       visit: {
         visit_tracking_id: visit.visit_tracking_id,
-        patient_first_name: patient.first_name
+        patient_first_name: patient.first_name,
+        current_stage: {
+          name: currentStage.name,
+          color: currentStage.color
+        },
+        stage_progress_percent: stageProgressPercent,
+        updated_at: visit.updated_at
       }
     });
   } catch (error) {
@@ -251,11 +266,10 @@ export const verifyOTP = async (req: Request, res: Response) => {
 };
 
 // GET /family/visit/:token - Get patient status (family view)
-export const getVisitStatus = async (req: FamilyAuthRequest, res: Response) => {
+export const getVisitStatus = async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
 
-    // Verify token
     const familyToken = await FamilyToken.findOne({
       where: { token },
       include: [
@@ -271,7 +285,7 @@ export const getVisitStatus = async (req: FamilyAuthRequest, res: Response) => {
             {
               model: Stage,
               as: 'current_stage',
-              attributes: ['name', 'description', 'color']
+              attributes: ['name', 'color']
             }
           ]
         }
@@ -285,7 +299,6 @@ export const getVisitStatus = async (req: FamilyAuthRequest, res: Response) => {
       });
     }
 
-    // Check if token expired
     if (new Date() > familyToken.token_expires_at) {
       return res.status(401).json({
         success: false,
@@ -296,28 +309,21 @@ export const getVisitStatus = async (req: FamilyAuthRequest, res: Response) => {
     const visit = familyToken.get('visit') as any;
     const patient = visit.patient;
     const currentStage = visit.current_stage;
-
-    const durationMinutes = Math.floor((Date.now() - new Date(visit.created_at).getTime()) / 60000);
-
-    // Calculate progress percentage based on stage (simplified)
-    const stageOrder = ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre', 'In Theatre', 'Recovery', 'Discharged'];
-    const currentIndex = stageOrder.indexOf(currentStage.name);
-    const progressPercentage = currentIndex >= 0 ? Math.round(((currentIndex + 1) / stageOrder.length) * 100) : 0;
+    const currentIndex = STAGE_ORDER.indexOf(currentStage.name);
+    const stageProgressPercent = currentIndex >= 0
+      ? Math.round(((currentIndex + 1) / STAGE_ORDER.length) * 100)
+      : 0;
 
     res.json({
       success: true,
-      patient: {
-        first_name: patient.first_name
-      },
+      visit_tracking_id: visit.visit_tracking_id,
+      patient_first_name: patient.first_name,
       current_stage: {
         name: currentStage.name,
-        description: currentStage.description,
-        color: currentStage.color,
-        duration_minutes: durationMinutes
+        color: currentStage.color
       },
-      progress_percentage: progressPercentage,
-      last_updated: visit.updated_at,
-      auto_refresh_seconds: 60
+      stage_progress_percent: stageProgressPercent,
+      updated_at: visit.updated_at
     });
   } catch (error) {
     console.error('Get visit status error:', error);

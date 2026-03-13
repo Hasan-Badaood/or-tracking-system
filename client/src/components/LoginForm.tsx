@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { mockUsers } from '@/lib/mockData';
+import { authAPI } from '@/api/auth';
 import { Loader2 } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
@@ -18,32 +18,26 @@ export const LoginForm: React.FC = () => {
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const user = mockUsers.find(
-        (u) => u.username === username && u.password === password
-      );
+    try {
+      const data = await authAPI.login({ username, password });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
 
-      if (user) {
-        localStorage.setItem('token', 'mock-token-' + Date.now());
-        localStorage.setItem('user', JSON.stringify({
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          role: user.role
-        }));
-
-        if (user.role === 'reception') {
-          navigate('/reception');
-        } else if (user.role === 'nurse') {
-          navigate('/nurse');
-        } else {
-          navigate('/dashboard');
-        }
+      if (data.user.role === 'reception') {
+        navigate('/reception');
+      } else if (data.user.role === 'nurse') {
+        navigate('/nurse');
+      } else if (data.user.role === 'admin') {
+        navigate('/admin');
       } else {
-        setError('Invalid username or password');
+        navigate('/dashboard');
       }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Invalid username or password';
+      setError(message);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -93,16 +87,6 @@ export const LoginForm: React.FC = () => {
           'Login'
         )}
       </Button>
-      <div className="pt-2 border-t border-gray-200">
-        <p className="text-xs text-gray-600 text-center mb-2 font-medium">
-          Demo Accounts:
-        </p>
-        <div className="space-y-1 text-xs text-gray-500">
-          <p><span className="font-semibold">Admin:</span> admin / admin123</p>
-          <p><span className="font-semibold">Nurse:</span> nurse1 / nurse123</p>
-          <p><span className="font-semibold">Reception:</span> reception / reception123</p>
-        </div>
-      </div>
     </form>
   );
 };
