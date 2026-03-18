@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { reportsAPI, DailySummary, StageDurationRow, DateRangeRow } from '@/api/reports';
+import { reportsAPI, DailySummary, StageDurationRow, DateRangeRow, AuditLogRow } from '@/api/reports';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -51,7 +51,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 
-type Section = 'overview' | 'live' | 'reports' | 'users' | 'settings';
+type Section = 'overview' | 'live' | 'reports' | 'audit' | 'users' | 'settings';
 
 const STAGE_COLORS: Record<string, string> = {
   Arrived:    '#3498db',
@@ -123,6 +123,13 @@ export const AdminDashboard: React.FC = () => {
   const [savingUser, setSavingUser] = useState(false);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
 
+  // Audit log
+  const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditOffset, setAuditOffset] = useState(0);
+  const AUDIT_PAGE = 50;
+
   // Reports data
   const today = new Date().toISOString().split('T')[0];
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -134,6 +141,7 @@ export const AdminDashboard: React.FC = () => {
   const [stageDurations, setStageDurations] = useState<StageDurationRow[]>([]);
   const [dateRangeRows, setDateRangeRows] = useState<DateRangeRow[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true);
@@ -164,9 +172,7 @@ export const AdminDashboard: React.FC = () => {
   const loadSettingsRooms = useCallback(async () => {
     setSettingsLoading(true);
     try {
-      // fetch all rooms including inactive by calling the rooms endpoint
-      // (backend returns active only; we handle deactivation via the settings panel)
-      const data = await roomsAPI.getAll();
+      const data = await roomsAPI.getAllIncludingInactive();
       setSettingsRooms(data);
     } catch {
       // keep existing
@@ -300,6 +306,20 @@ export const AdminDashboard: React.FC = () => {
     if (section === 'users') loadStaffUsers();
   }, [section, loadStaffUsers]);
 
+  const loadAuditLog = useCallback(async (offset: number) => {
+    setAuditLoading(true);
+    try {
+      const data = await reportsAPI.getAuditLog(AUDIT_PAGE, offset);
+      setAuditRows(data.rows);
+      setAuditTotal(data.total);
+    } catch { /* keep existing */ }
+    finally { setAuditLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (section === 'audit') loadAuditLog(auditOffset);
+  }, [section, auditOffset, loadAuditLog]);
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserFormError('');
@@ -343,6 +363,35 @@ export const AdminDashboard: React.FC = () => {
     return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const exportCSV = (filename: string, rows: string[][], headers: string[]) => {
+    const lines = [headers, ...rows].map((r) => r.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportDayReport = () => {
+    if (!dailySummary) return;
+    exportCSV(
+      `report-${dailySummary.date}.csv`,
+      dailySummary.by_stage.map((r) => [r.stage_name, String(r.count), String(r.average_duration_minutes)]),
+      ['Stage', 'Count', 'Avg Duration (mins)'],
+    );
+  };
+
+  const exportRangeReport = () => {
+    if (!dateRangeRows.length) return;
+    exportCSV(
+      `report-range.csv`,
+      dateRangeRows.map((r) => [r.date, String(r.total), String(r.completed), String(r.active)]),
+      ['Date', 'Total', 'Completed', 'Active'],
+    );
+  };
+
   const openAddRoom = () => {
     setRoomForm({ name: '', room_number: '', room_type: 'General' });
     setRoomFormError('');
@@ -382,6 +431,10 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleToggleRoom = async (room: Room) => {
+    if (room.active) {
+      const ok = window.confirm(`Deactivate room "${room.name}"? It will no longer appear for staff.`);
+      if (!ok) return;
+    }
     setTogglingRoomId(room.id);
     try {
       const updated = await roomsAPI.update(room.id, { active: !room.active });
@@ -446,6 +499,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'overview',  label: 'Overview',      icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'live',      label: 'Live Patients', icon: <Activity className="h-4 w-4" /> },
     { id: 'reports',   label: 'Reports',       icon: <BarChart2 className="h-4 w-4" /> },
+    { id: 'audit',     label: 'Audit Log',     icon: <Clock className="h-4 w-4" /> },
     { id: 'users',     label: 'Users',         icon: <Users className="h-4 w-4" /> },
     { id: 'settings',  label: 'Settings',      icon: <Settings className="h-4 w-4" /> },
   ];
@@ -454,6 +508,7 @@ export const AdminDashboard: React.FC = () => {
     section === 'overview' ? 'Overview' :
     section === 'live'     ? 'Live Patients' :
     section === 'reports'  ? 'Reports' :
+    section === 'audit'    ? 'Audit Log' :
     section === 'settings' ? 'Settings' : 'Admin';
 
   const refreshAction = section === 'overview' ? (
@@ -795,6 +850,14 @@ export const AdminDashboard: React.FC = () => {
                         {reportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                         Load
                       </button>
+                      {dailySummary && (
+                        <button
+                          onClick={exportDayReport}
+                          className="px-4 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Export CSV
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
@@ -812,17 +875,33 @@ export const AdminDashboard: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                       />
                       <button
-                        onClick={() => loadRangeReport(rangeStart, rangeEnd)}
+                        onClick={() => {
+                          if (rangeStart > rangeEnd) { setReportError('Start date must be before end date.'); return; }
+                          setReportError('');
+                          loadRangeReport(rangeStart, rangeEnd);
+                        }}
                         disabled={reportLoading}
                         className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
                       >
                         {reportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                         Load
                       </button>
+                      {dateRangeRows.length > 0 && (
+                        <button
+                          onClick={exportRangeReport}
+                          className="px-4 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Export CSV
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
+
+              {reportError && (
+                <p className="text-sm text-red-500 px-1">{reportError}</p>
+              )}
 
               {reportLoading && (
                 <div className="flex items-center justify-center py-20">
@@ -998,6 +1077,105 @@ export const AdminDashboard: React.FC = () => {
                 </>
               )}
 
+            </div>
+          )}
+
+          {/* ── AUDIT LOG ── */}
+          {section === 'audit' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-slate-800">Stage transition log</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">{auditTotal} events total</p>
+                  </div>
+                  <button
+                    onClick={() => loadAuditLog(auditOffset)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refresh
+                  </button>
+                </div>
+
+                {auditLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-7 w-7 animate-spin text-slate-300" />
+                  </div>
+                ) : auditRows.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 text-sm">No events recorded yet.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Time</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Visit</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Patient</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Transition</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">By</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {auditRows.map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-xs text-slate-500 whitespace-nowrap tabular-nums">
+                              {new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.visit_tracking_id ?? '—'}</td>
+                            <td className="px-5 py-3 text-slate-700 text-xs">{row.patient_name ?? '—'}</td>
+                            <td className="px-5 py-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {row.from_stage ? (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: row.from_stage.color }}>
+                                    {row.from_stage.name}
+                                  </span>
+                                ) : <span className="text-slate-300 text-xs">—</span>}
+                                <span className="text-slate-400 text-xs">→</span>
+                                {row.to_stage && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: row.to_stage.color }}>
+                                    {row.to_stage.name}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 text-xs text-slate-500">
+                              {row.updated_by ? (
+                                <span>{row.updated_by.name} <span className="text-slate-400">({row.updated_by.role})</span></span>
+                              ) : '—'}
+                            </td>
+                            <td className="px-5 py-3 text-xs text-slate-400 max-w-xs truncate">{row.notes ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {auditTotal > AUDIT_PAGE && (
+                  <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Showing {auditOffset + 1}–{Math.min(auditOffset + AUDIT_PAGE, auditTotal)} of {auditTotal}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setAuditOffset(Math.max(0, auditOffset - AUDIT_PAGE))}
+                        disabled={auditOffset === 0}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setAuditOffset(auditOffset + AUDIT_PAGE)}
+                        disabled={auditOffset + AUDIT_PAGE >= auditTotal}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

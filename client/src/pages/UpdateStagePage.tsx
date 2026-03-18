@@ -122,6 +122,21 @@ export const UpdateStagePage: React.FC = () => {
     });
   };
 
+  if (!trackingId) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar title="Update Stage" onBack={() => navigate(-1)} />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center space-y-3">
+            <p className="text-gray-500 text-lg">No visit selected</p>
+            <p className="text-gray-400 text-sm">Scan a patient barcode or navigate from the dashboard.</p>
+            <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -132,10 +147,14 @@ export const UpdateStagePage: React.FC = () => {
 
   if (!visit) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 text-lg mb-4">Visit not found</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar title="Update Stage" onBack={() => navigate(-1)} />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center space-y-3">
+            <p className="text-gray-500 text-lg">Visit not found</p>
+            <p className="text-gray-400 text-sm">Tracking ID: {trackingId}</p>
+            <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+          </div>
         </div>
       </div>
     );

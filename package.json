@@ -1,0 +1,16 @@
+{
+
+  "name": "or-tracking",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"server,client\" --prefix-colors \"cyan,magenta\" \"pnpm --filter or-tracking-backend dev\" \"pnpm --filter or-tracking-frontend dev\"",
+    "install:all": "pnpm --filter or-tracking-backend install && pnpm --filter or-tracking-frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "pnpm": {
+    "overrides": {}
+  }
+}

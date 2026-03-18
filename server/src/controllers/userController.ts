@@ -159,41 +159,33 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Current password and new password are required'
-      });
+    if (!new_password) {
+      return res.status(400).json({ success: false, error: 'new_password is required' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
     }
 
-    // Check if user is changing their own password or is admin
     const isOwnAccount = req.user && req.user.id === parseInt(id);
     const isAdmin = req.user && req.user.role === 'admin';
 
     if (!isOwnAccount && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        error: 'You can only change your own password'
-      });
+      return res.status(403).json({ success: false, error: 'You can only change your own password' });
     }
 
     const user = await User.findByPk(id);
-
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Verify current password (only if changing own password)
-    if (isOwnAccount) {
+    // Require current password only when the user is changing their own password
+    if (isOwnAccount && !isAdmin) {
+      if (!current_password) {
+        return res.status(400).json({ success: false, error: 'current_password is required' });
+      }
       const validPassword = await user.comparePassword(current_password);
       if (!validPassword) {
-        return res.status(401).json({
-          success: false,
-          error: 'Current password is incorrect'
-        });
+        return res.status(401).json({ success: false, error: 'Current password is incorrect' });
       }
     }
 

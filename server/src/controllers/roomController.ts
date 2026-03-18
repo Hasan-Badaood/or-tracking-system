@@ -12,8 +12,9 @@ interface AuthRequest extends Request {
 // GET /rooms - Get all OR rooms with current status
 export const getRooms = async (req: Request, res: Response) => {
   try {
+    const includeAll = req.query.includeAll === 'true';
     const rooms = await ORRoom.findAll({
-      where: { active: true },
+      where: includeAll ? {} : { active: true },
       include: [
         {
           model: Visit,

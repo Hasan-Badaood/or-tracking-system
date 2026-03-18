@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Development]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: TypeScript compile check ─────────────────────────────────────
+  build-server:
+    name: Build server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Type-check & build
+        run: pnpm --filter or-tracking-backend build
+
+  # ── Frontend: Vite build check ─────────────────────────────────────────────
+  build-client:
+    name: Build client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter or-tracking-frontend build
+        env:
+          # Use the production API URL stored as a repo secret,
+          # or fall back to localhost so the build doesn't fail in CI
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'http://localhost:3000/api' }}
+
+  # ── Deploy to Render (main branch only) ────────────────────────────────────
+  deploy:
+    name: Deploy to Render
+    needs: [build-server, build-client]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Trigger backend deploy
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_SERVER != '' }}
+        run: curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_SERVER }}"
+
+      - name: Trigger frontend deploy
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_CLIENT != '' }}
+        run: curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_CLIENT }}"
