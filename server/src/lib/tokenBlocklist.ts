@@ -1,30 +1,48 @@
-// In-memory JWT token blocklist.
-// Stores token -> expiry (unix ms) so expired entries can be pruned.
-// Resets on server restart, which is acceptable for an 8-hour token window.
+import { Op } from 'sequelize';
+import { BlacklistedToken } from '../models/BlacklistedToken';
 
-const blocklist = new Map<string, number>();
+// Fallback in-memory set used before the DB is ready or if a DB call fails.
+const memoryFallback = new Map<string, number>();
 
-// Prune expired tokens every 15 minutes to prevent unbounded memory growth.
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, expiresAt] of blocklist) {
-    if (expiresAt < now) {
-      blocklist.delete(token);
+export const addToBlocklist = async (token: string, expiresAt: number): Promise<void> => {
+  memoryFallback.set(token, expiresAt);
+  try {
+    await BlacklistedToken.upsert({ token, expires_at: new Date(expiresAt) });
+  } catch {
+    // Keep memory fallback — the token is still blocked this session.
+  }
+};
+
+export const isBlacklisted = async (token: string): Promise<boolean> => {
+  // Check memory first (fast path / pre-DB-ready window)
+  const memExp = memoryFallback.get(token);
+  if (memExp !== undefined) {
+    if (memExp < Date.now()) {
+      memoryFallback.delete(token);
+    } else {
+      return true;
     }
   }
-}, 15 * 60 * 1000);
 
-export const addToBlocklist = (token: string, expiresAt: number): void => {
-  blocklist.set(token, expiresAt);
-};
-
-export const isBlacklisted = (token: string): boolean => {
-  const expiresAt = blocklist.get(token);
-  if (expiresAt === undefined) return false;
-  // Remove inline if already expired
-  if (expiresAt < Date.now()) {
-    blocklist.delete(token);
+  try {
+    const record = await BlacklistedToken.findOne({
+      where: { token, expires_at: { [Op.gt]: new Date() } },
+    });
+    return record !== null;
+  } catch {
     return false;
   }
-  return true;
 };
+
+// Prune expired DB rows every 30 minutes.
+setInterval(async () => {
+  try {
+    await BlacklistedToken.destroy({ where: { expires_at: { [Op.lte]: new Date() } } });
+  } catch { /* ignore */ }
+
+  // Prune memory fallback too
+  const now = Date.now();
+  for (const [token, exp] of memoryFallback) {
+    if (exp < now) memoryFallback.delete(token);
+  }
+}, 30 * 60 * 1000);

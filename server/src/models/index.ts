@@ -7,6 +7,7 @@ import { StageEvent } from './StageEvent';
 import { FamilyContact } from './FamilyContact';
 import { CleaningTimer } from './CleaningTimer';
 import { FamilyToken } from './FamilyToken';
+import { BlacklistedToken } from './BlacklistedToken';
 
 // Define all relationships
 Visit.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
@@ -40,5 +41,6 @@ export {
   StageEvent,
   FamilyContact,
   CleaningTimer,
-  FamilyToken
+  FamilyToken,
+  BlacklistedToken,
 };

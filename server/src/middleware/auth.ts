@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -19,7 +19,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
   const token = authHeader.substring(7);
 
-  if (isBlacklisted(token)) {
+  if (await isBlacklisted(token)) {
     return res.status(401).json({ error: 'Token has been revoked' });
   }
 
@@ -27,7 +27,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     const decoded = jwt.verify(token, process.env.JWT_SECRET!);
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
 };

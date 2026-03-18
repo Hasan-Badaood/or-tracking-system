@@ -12,6 +12,7 @@ export const ReceptionDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [visits, setVisits]           = useState<Visit[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [fetchError, setFetchError]   = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -24,11 +25,11 @@ export const ReceptionDashboard: React.FC = () => {
       });
       setVisits(data.visits);
     } catch {
-      // keep existing
+      if (loading) setFetchError('Failed to load visits. Check your connection and refresh.');
     } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t = setTimeout(fetchVisits, 300);
@@ -52,6 +53,10 @@ export const ReceptionDashboard: React.FC = () => {
       <Navbar title="Reception" />
 
       <main className="p-3 sm:p-5 space-y-4 max-w-7xl mx-auto">
+
+        {fetchError && (
+          <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{fetchError}</div>
+        )}
 
         {/* ── Top row: stats + register button ── */}
         <div className="flex flex-col sm:flex-row gap-3">

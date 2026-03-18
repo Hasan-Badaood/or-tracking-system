@@ -34,4 +34,8 @@ export const usersAPI = {
     const response = await apiClient.put<{ user: StaffUser }>(`/users/${id}`, data);
     return response.data.user;
   },
+
+  resetPassword: async (id: number, newPassword: string): Promise<void> => {
+    await apiClient.put(`/users/${id}/password`, { new_password: newPassword });
+  },
 };

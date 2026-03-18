@@ -16,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { usersAPI, StaffUser } from '@/api/users';
 import { Navbar } from '@/components/layout/Navbar';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound } from 'lucide-react';
 
 const ROLE_PILL: Record<string, string> = {
   admin:     'bg-rose-100 text-rose-700 border-rose-200',
@@ -35,6 +35,10 @@ export const UserManagement: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [resetTarget, setResetTarget] = useState<StaffUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     usersAPI.getAll()
@@ -44,6 +48,7 @@ export const UserManagement: React.FC = () => {
   }, []);
 
   const toggleActive = async (u: StaffUser) => {
+    if (u.active && !window.confirm(`Deactivate ${u.name}? They will no longer be able to log in.`)) return;
     setTogglingId(u.id);
     try {
       const updated = await usersAPI.update(u.id, { active: !u.active });
@@ -80,6 +85,22 @@ export const UserManagement: React.FC = () => {
       setFormError(err.response?.data?.message || 'Failed to create user');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError('');
+    if (newPassword.length < 6) { setResetError('Password must be at least 6 characters.'); return; }
+    setResetting(true);
+    try {
+      await usersAPI.resetPassword(resetTarget!.id, newPassword);
+      setResetTarget(null);
+      setNewPassword('');
+    } catch (err: any) {
+      setResetError(err.response?.data?.error || 'Failed to reset password');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -175,20 +196,29 @@ export const UserManagement: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <button
-                          onClick={() => toggleActive(u)}
-                          disabled={togglingId === u.id}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
-                            u.active
-                              ? 'text-red-600 border border-red-200 hover:bg-red-50'
-                              : 'text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
-                          }`}
-                        >
-                          {togglingId === u.id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : u.active ? 'Deactivate' : 'Activate'
-                          }
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => { setResetTarget(u); setNewPassword(''); setResetError(''); }}
+                            title="Reset password"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => toggleActive(u)}
+                            disabled={togglingId === u.id}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                              u.active
+                                ? 'text-red-600 border border-red-200 hover:bg-red-50'
+                                : 'text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {togglingId === u.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : u.active ? 'Deactivate' : 'Activate'
+                            }
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -198,6 +228,47 @@ export const UserManagement: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) setResetTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset password — {resetTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">New password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min. 6 characters"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+            {resetError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-lg">{resetError}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setResetTarget(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={resetting}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {resetting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Reset
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Create user dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setForm(emptyForm); setFormError(''); } }}>

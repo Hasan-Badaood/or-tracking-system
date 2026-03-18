@@ -25,6 +25,17 @@ export interface StageDurationRow {
   sample_size: number;
 }
 
+export interface AuditLogRow {
+  id: number;
+  created_at: string;
+  visit_tracking_id: string | null;
+  patient_name: string | null;
+  from_stage: { name: string; color: string } | null;
+  to_stage:   { name: string; color: string } | null;
+  updated_by: { name: string; role: string } | null;
+  notes: string | null;
+}
+
 export interface DateRangeRow {
   date: string;
   total: number;
@@ -56,5 +67,10 @@ export const reportsAPI = {
   getNotificationConfig: async (): Promise<{ emailConfigured: boolean; smsConfigured: boolean }> => {
     const response = await apiClient.get('/reports/notification-config');
     return { emailConfigured: response.data.emailConfigured, smsConfigured: response.data.smsConfigured };
+  },
+
+  getAuditLog: async (limit = 50, offset = 0): Promise<{ total: number; rows: AuditLogRow[] }> => {
+    const response = await apiClient.get('/reports/audit-log', { params: { limit, offset } });
+    return { total: response.data.total, rows: response.data.rows ?? [] };
   },
 };
