@@ -1,0 +1,65 @@
+databases:
+  - name: or-tracking-db
+    databaseName: or_tracking
+    user: or_tracking_user
+    plan: free
+
+services:
+  # ── Backend API (Docker) ─────────────────────────────────────────────────
+  - type: web
+    name: or-tracking-api
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_HOST
+        fromDatabase:
+          name: or-tracking-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: or-tracking-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: or-tracking-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: or-tracking-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: or-tracking-db
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
+      # Optional — add EMAIL_* and TWILIO_* vars manually in the Render dashboard
+
+  # ── Frontend (Static Site) ────────────────────────────────────────────────
+  - type: static
+    name: or-tracking-client
+    buildCommand: npm install -g pnpm@9 && pnpm install --filter or-tracking-frontend && pnpm --filter or-tracking-frontend build
+    staticPublishPath: ./client/dist
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Set this to your backend URL after the first deploy, e.g.:
+      # https://or-tracking-api.onrender.com/api
+      - key: VITE_API_URL
+        sync: false

@@ -22,6 +22,13 @@ export const DashboardPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingRoom, setUpdatingRoom] = useState<number | null>(null);
 
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.role === 'admin') navigate('/admin', { replace: true });
+    else if (user.role === 'nurse') navigate('/nurse', { replace: true });
+    else if (user.role === 'reception') navigate('/reception', { replace: true });
+  }, [navigate]);
+
   const fetchData = async () => {
     setRefreshing(true);
     try {

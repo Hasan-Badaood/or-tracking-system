@@ -95,7 +95,7 @@ export const logout = async (req: AuthRequest, res: Response) => {
       const token = authHeader.substring(7);
       const decoded = jwt.decode(token) as { exp?: number } | null;
       const expiresAt = decoded?.exp ? decoded.exp * 1000 : Date.now() + 8 * 60 * 60 * 1000;
-      addToBlocklist(token, expiresAt);
+      await addToBlocklist(token, expiresAt);
     }
 
     res.json({

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './config/database';
+import './models'; // ensure all models are registered before sync
 import authRoutes from './routes/auth';
 import visitRoutes from './routes/visits';
 import stageRoutes from './routes/stages';
@@ -13,6 +14,15 @@ import barcodeRoutes from './routes/barcode';
 import { generalApiRateLimit } from './middleware/rateLimit';
 
 dotenv.config();
+
+// Validate required environment variables before starting
+const REQUIRED_ENV = ['JWT_SECRET', 'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as const;
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  console.error('Check your .env file and ensure all required variables are set.');
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;

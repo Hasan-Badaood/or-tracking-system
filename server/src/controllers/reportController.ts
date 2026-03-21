@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
-import { Visit, Stage, ORRoom, StageEvent, Patient } from '../models';
+import { Visit, Stage, ORRoom, StageEvent, Patient, User } from '../models';
 
 // GET /reports/daily-summary - Daily OR utilization summary
 export const getDailySummary = async (req: Request, res: Response) => {
@@ -245,5 +245,48 @@ export const getStageDuration = async (req: Request, res: Response) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+};
+
+// GET /reports/audit-log - Recent stage transition events
+export const getAuditLog = async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const events = await StageEvent.findAndCountAll({
+      limit,
+      offset,
+      order: [['created_at', 'DESC']],
+      include: [
+        {
+          model: Visit,
+          as: 'visit',
+          attributes: ['visit_tracking_id'],
+          include: [{ model: Patient, as: 'patient', attributes: ['first_name', 'last_name'] }],
+        },
+        { model: Stage, as: 'from_stage', attributes: ['name', 'color'] },
+        { model: Stage, as: 'to_stage',   attributes: ['name', 'color'] },
+        { model: User,  as: 'updated_by_user', attributes: ['name', 'role'] },
+      ],
+    });
+
+    const rows = events.rows.map((e: any) => ({
+      id: e.id,
+      created_at: e.created_at,
+      visit_tracking_id: e.visit?.visit_tracking_id ?? null,
+      patient_name: e.visit?.patient
+        ? `${e.visit.patient.first_name} ${e.visit.patient.last_name}`
+        : null,
+      from_stage: e.from_stage ? { name: e.from_stage.name, color: e.from_stage.color } : null,
+      to_stage:   e.to_stage   ? { name: e.to_stage.name,   color: e.to_stage.color   } : null,
+      updated_by: e.updated_by_user ? { name: e.updated_by_user.name, role: e.updated_by_user.role } : null,
+      notes: e.notes ?? null,
+    }));
+
+    res.json({ success: true, total: events.count, rows });
+  } catch (error) {
+    console.error('Get audit log error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

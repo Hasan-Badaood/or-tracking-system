@@ -69,7 +69,14 @@ export const FamilyPortal: React.FC = () => {
       });
       setStep('otp');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Could not find a visit with those details. Please check and try again.');
+      const msg: string = err.response?.data?.error ?? '';
+      if (msg.includes('No family contact')) {
+        setError('No family contact was registered for this visit. Please ask reception to add your details when the patient was admitted.');
+      } else if (msg.includes('consent')) {
+        setError('The patient has not consented to family tracking for this visit.');
+      } else {
+        setError(msg || 'Could not find a visit with those details. Please check the Visit ID and try again.');
+      }
     } finally {
       setLoading(false);
     }
