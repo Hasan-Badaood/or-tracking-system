@@ -40,6 +40,8 @@ services:
           property: password
       - key: JWT_SECRET
         generateValue: true
+      - key: SEED_SECRET
+        generateValue: true
       # Optional — add EMAIL_* and TWILIO_* vars manually in the Render dashboard
 
   # ── Frontend (Static Site) ────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import familyRoutes from './routes/family';
 import userRoutes from './routes/users';
 import reportRoutes from './routes/reports';
 import barcodeRoutes from './routes/barcode';
+import seedRoutes from './routes/seed';
 import { generalApiRateLimit } from './middleware/rateLimit';
 
 dotenv.config();
@@ -41,6 +42,7 @@ app.use('/api/family', familyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/barcode', barcodeRoutes);
+app.use('/api/seed', seedRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
