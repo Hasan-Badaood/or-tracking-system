@@ -74,7 +74,12 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
       setFcName(''); setFcRelationship(''); setFcPhone(''); setFcEmail(''); setFcConsent(false);
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create visit');
+      const msg: string = err.response?.data?.error || '';
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('mrn') || msg.toLowerCase().includes('unique')) {
+        setError(`A patient with MRN "${mrn}" already exists. Check the MRN and try again.`);
+      } else {
+        setError(msg || 'Failed to create visit');
+      }
     } finally {
       setLoading(false);
     }

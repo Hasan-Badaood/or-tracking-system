@@ -1,5 +1,12 @@
 import apiClient from './client';
 
+export interface CleaningTimer {
+  started_at: string;
+  scheduled_end_at: string;
+  minutes_remaining: number;
+  completed: boolean;
+}
+
 export interface Room {
   id: number;
   name: string;
@@ -7,6 +14,7 @@ export interface Room {
   room_type?: string;
   status: 'Available' | 'Occupied' | 'Cleaning' | 'Maintenance';
   active?: boolean;
+  cleaning_timer?: CleaningTimer | null;
 }
 
 export interface RoomsResponse {
@@ -20,10 +28,7 @@ export const roomsAPI = {
   },
 
   getAllIncludingInactive: async (): Promise<Room[]> => {
-    // The GET /rooms only returns active ones; for settings we need all
-    // Since backend doesn't support this yet, we use the same endpoint
-    // but the settings panel will manage active/inactive via update
-    const response = await apiClient.get<RoomsResponse>('/rooms');
+    const response = await apiClient.get<RoomsResponse>('/rooms?includeAll=true');
     return response.data.rooms;
   },
 
@@ -40,6 +45,14 @@ export const roomsAPI = {
   updateStatus: async (id: number, status: Room['status']): Promise<Room> => {
     const response = await apiClient.put<{ room: Room }>(`/rooms/${id}/status`, { status });
     return response.data.room;
+  },
+
+  startCleaning: async (id: number, duration_minutes = 15): Promise<void> => {
+    await apiClient.post(`/rooms/${id}/cleaning/start`, { duration_minutes });
+  },
+
+  completeCleaning: async (id: number): Promise<void> => {
+    await apiClient.post(`/rooms/${id}/cleaning/complete`, {});
   },
 
   delete: async (id: number): Promise<void> => {

@@ -6,7 +6,9 @@ import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { visitsAPI, Visit } from '@/api/visits';
 import { roomsAPI, Room } from '@/api/rooms';
 import { Navbar } from '@/components/layout/Navbar';
-import { Camera, Loader2 } from 'lucide-react';
+import { Camera, Loader2, Timer } from 'lucide-react';
+
+const CLEANING_DURATION_MINUTES = 15;
 
 const ROOM_STATUS_STYLES: Record<string, { dot: string; label: string; badge: string }> = {
   Available:   { dot: 'bg-emerald-500', label: 'text-emerald-700', badge: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
@@ -21,6 +23,7 @@ export const NurseDashboard: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [loadingRooms, setLoadingRooms] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [visitId, setVisitId] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [updatingRoom, setUpdatingRoom] = useState<number | null>(null);
@@ -30,9 +33,10 @@ export const NurseDashboard: React.FC = () => {
     try {
       const data = await visitsAPI.getAll({ active: true, limit: 100 });
       setVisits(data.visits);
-    } catch { /* keep existing */ }
+      setFetchError('');
+    } catch { if (loadingVisits) setFetchError('Failed to load data. Check your connection and refresh.'); }
     finally { setLoadingVisits(false); }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -73,6 +77,24 @@ export const NurseDashboard: React.FC = () => {
     finally { setUpdatingRoom(null); }
   };
 
+  const handleStartCleaning = async (roomId: number) => {
+    setUpdatingRoom(roomId);
+    try {
+      await roomsAPI.startCleaning(roomId, CLEANING_DURATION_MINUTES);
+      await fetchRooms();
+    } catch { /* keep existing */ }
+    finally { setUpdatingRoom(null); }
+  };
+
+  const handleCompleteCleaning = async (roomId: number) => {
+    setUpdatingRoom(roomId);
+    try {
+      await roomsAPI.completeCleaning(roomId);
+      await fetchRooms();
+    } catch { /* keep existing */ }
+    finally { setUpdatingRoom(null); }
+  };
+
   const handleScan = (result: string) => {
     setShowScanner(false);
     navigate(`/update-stage?visitId=${result.trim()}`);
@@ -97,6 +119,10 @@ export const NurseDashboard: React.FC = () => {
       <Navbar title="Nurse Station" />
 
       <main className="p-3 sm:p-5 space-y-4 max-w-7xl mx-auto">
+
+        {fetchError && (
+          <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{fetchError}</div>
+        )}
 
         {/* ── Stats strip ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -192,6 +218,15 @@ export const NurseDashboard: React.FC = () => {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${style.badge}`}>
                           {room.status}
                         </span>
+
+                        {/* Cleaning timer display */}
+                        {room.status === 'Cleaning' && room.cleaning_timer && (
+                          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                            <Timer className="w-3 h-3 shrink-0" />
+                            <span>{room.cleaning_timer.minutes_remaining}m remaining</span>
+                          </div>
+                        )}
+
                         <Select
                           value={room.status}
                           onValueChange={(val) => handleRoomStatusChange(room.id, val as Room['status'])}
@@ -210,6 +245,26 @@ export const NurseDashboard: React.FC = () => {
                             <SelectItem value="Maintenance">Maintenance</SelectItem>
                           </SelectContent>
                         </Select>
+
+                        {/* Cleaning action buttons */}
+                        {room.status === 'Available' && (
+                          <button
+                            onClick={() => handleStartCleaning(room.id)}
+                            disabled={updatingRoom === room.id}
+                            className="w-full h-6 text-xs text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
+                          >
+                            Start {CLEANING_DURATION_MINUTES}m clean
+                          </button>
+                        )}
+                        {room.status === 'Cleaning' && (
+                          <button
+                            onClick={() => handleCompleteCleaning(room.id)}
+                            disabled={updatingRoom === room.id}
+                            className="w-full h-6 text-xs text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                          >
+                            Mark clean
+                          </button>
+                        )}
                       </div>
                     );
                   })}
