@@ -43,8 +43,9 @@ services:
       # Optional — add EMAIL_* and TWILIO_* vars manually in the Render dashboard
 
   # ── Frontend (Static Site) ────────────────────────────────────────────────
-  - type: static_site
+  - type: web
     name: or-tracking-client
+    runtime: static
     buildCommand: npm install -g pnpm@9 && pnpm install --filter or-tracking-frontend && pnpm --filter or-tracking-frontend build
     staticPublishPath: ./client/dist
     headers:
