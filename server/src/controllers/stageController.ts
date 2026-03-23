@@ -80,7 +80,8 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
     }
 
     // OR room is mandatory when moving to "In Theatre"
-    if (toStage.name === 'In Theatre' && (or_room_id === undefined || or_room_id === null)) {
+    const isInTheatre = toStage.name.trim().toLowerCase() === 'in theatre';
+    if (isInTheatre && (or_room_id === undefined || or_room_id === null)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -141,7 +142,8 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
 
     // If leaving "In Theatre", free the current OR room and start a 15-minute cleaning timer
     const fromStage = visit.get('current_stage') as any;
-    if (fromStage?.name === 'In Theatre' && toStage.name !== 'In Theatre' && visit.or_room_id) {
+    const leavingTheatre = fromStage?.name?.trim().toLowerCase() === 'in theatre' && !isInTheatre;
+    if (leavingTheatre && visit.or_room_id) {
       const prevRoom = await ORRoom.findByPk(visit.or_room_id, { transaction });
       if (prevRoom) {
         prevRoom.status = 'Cleaning';

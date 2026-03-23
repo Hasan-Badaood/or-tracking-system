@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { authenticate } from '../middleware/auth';
 import { SystemSetting } from '../models/SystemSetting';
 
@@ -88,9 +89,113 @@ router.post('/smtp/test', authenticate, async (req: Request, res: Response) => {
       port: parseInt(db['smtp_port'] ?? process.env.SMTP_PORT ?? '587', 10),
       secure: (db['smtp_secure'] ?? process.env.SMTP_SECURE ?? 'false') === 'true',
       auth: { user, pass },
+      connectionTimeout: 10_000,
+      socketTimeout: 10_000,
+      greetingTimeout: 10_000,
     });
 
-    await transporter.verify();
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out after 10 seconds')), 10_000)
+    );
+
+    await Promise.race([transporter.verify(), timeout]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/settings/resend
+router.get('/resend', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const rows = await SystemSetting.findAll({ where: { key: ['resend_api_key', 'resend_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.value !== null) db[row.key] = row.value;
+  }
+
+  res.json({
+    success: true,
+    config: {
+      resend_api_key: db['resend_api_key'] ? '••••••••' : '',
+      resend_from:    db['resend_from']    ?? '',
+    },
+  });
+});
+
+// PUT /api/settings/resend
+router.put('/resend', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { resend_api_key, resend_from } = req.body;
+
+  if (resend_api_key !== undefined && resend_api_key !== '••••••••' && resend_api_key !== '') {
+    await SystemSetting.upsert({ key: 'resend_api_key', value: String(resend_api_key).trim() });
+  }
+  if (resend_from !== undefined) {
+    await SystemSetting.upsert({ key: 'resend_from', value: String(resend_from).trim() });
+  }
+
+  res.json({ success: true });
+});
+
+// POST /api/settings/resend/test — validate API key (no email sent)
+router.post('/resend/test', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const rows = await SystemSetting.findAll({ where: { key: ['resend_api_key', 'resend_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.value) db[row.key] = row.value;
+  }
+
+  const apiKey = db['resend_api_key'] ?? '';
+  if (!apiKey) {
+    return res.status(400).json({ success: false, error: 'Resend API key is not set' });
+  }
+
+  try {
+    const client = new Resend(apiKey);
+    const { error } = await client.apiKeys.list();
+    if (error) throw new Error(error.message);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/settings/resend/send-test — actually send a test email to a given address
+router.post('/resend/send-test', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { to } = req.body;
+  if (!to) {
+    return res.status(400).json({ success: false, error: 'to address is required' });
+  }
+
+  const rows = await SystemSetting.findAll({ where: { key: ['resend_api_key', 'resend_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.value) db[row.key] = row.value;
+  }
+
+  const apiKey = db['resend_api_key'] ?? '';
+  const from   = db['resend_from']   ?? '';
+
+  if (!apiKey) return res.status(400).json({ success: false, error: 'Resend API key is not set' });
+  if (!from)   return res.status(400).json({ success: false, error: 'From address is not set' });
+
+  try {
+    const client = new Resend(apiKey);
+    const { error } = await client.emails.send({
+      from,
+      to,
+      subject: 'OR Tracker — email test',
+      text: 'This is a test email from your OR Patient Tracking System. Email notifications are working correctly.',
+      html: '<div style="font-family:sans-serif;padding:24px"><p>This is a test email from your <strong>OR Patient Tracking System</strong>.</p><p>Email notifications are working correctly.</p></div>',
+    });
+    if (error) throw new Error((error as any).message ?? JSON.stringify(error));
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });

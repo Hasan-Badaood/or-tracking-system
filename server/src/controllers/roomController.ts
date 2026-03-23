@@ -219,6 +219,20 @@ export const updateRoomStatus = async (req: AuthRequest, res: Response) => {
     room.last_status_change = new Date();
     await room.save();
 
+    // When manually setting to Cleaning, create a 15-minute timer so the scheduler picks it up
+    if (status === 'Cleaning') {
+      await CleaningTimer.destroy({ where: { room_id: room.id, completed: false } });
+      const startedAt = new Date();
+      await CleaningTimer.create({
+        room_id: room.id,
+        visit_id: null,
+        started_at: startedAt,
+        scheduled_end_at: new Date(startedAt.getTime() + 15 * 60_000),
+        duration_minutes: 15,
+        completed: false,
+      });
+    }
+
     res.json({
       success: true,
       room: {
@@ -401,25 +415,17 @@ export const completeCleaning = async (req: AuthRequest, res: Response) => {
     }
 
     const cleaningTimer = await CleaningTimer.findOne({
-      where: {
-        room_id: room.id,
-        completed: false
-      },
+      where: { room_id: room.id, completed: false },
       order: [['created_at', 'DESC']]
     });
 
-    if (!cleaningTimer) {
-      return res.status(404).json({
-        success: false,
-        error: 'No active cleaning timer found for this room'
-      });
+    if (cleaningTimer) {
+      cleaningTimer.completed = true;
+      cleaningTimer.actual_end_at = new Date();
+      cleaningTimer.manually_overridden = true;
+      cleaningTimer.override_reason = override_reason || null;
+      await cleaningTimer.save();
     }
-
-    cleaningTimer.completed = true;
-    cleaningTimer.actual_end_at = new Date();
-    cleaningTimer.manually_overridden = true;
-    cleaningTimer.override_reason = override_reason || null;
-    await cleaningTimer.save();
 
     room.status = 'Available';
     room.last_status_change = new Date();
@@ -427,16 +433,10 @@ export const completeCleaning = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      room: {
-        id: room.id,
-        status: room.status
-      },
-      cleaning_timer: {
-        id: cleaningTimer.id,
-        completed: cleaningTimer.completed,
-        manually_overridden: cleaningTimer.manually_overridden,
-        actual_end_at: cleaningTimer.actual_end_at
-      }
+      room: { id: room.id, status: room.status },
+      cleaning_timer: cleaningTimer
+        ? { id: cleaningTimer.id, completed: cleaningTimer.completed, manually_overridden: cleaningTimer.manually_overridden, actual_end_at: cleaningTimer.actual_end_at }
+        : null,
     });
   } catch (error) {
     console.error('Complete cleaning error:', error);
