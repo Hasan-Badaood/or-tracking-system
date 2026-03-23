@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import twilio from 'twilio';
+import { SystemSetting } from '../models/SystemSetting';
 
 interface NotificationPayload {
   patientName: string;
@@ -14,25 +15,70 @@ interface FamilyContact {
   phone?: string | null;
 }
 
-// ── Email ─────────────────────────────────────────────────────────────────────
+// ── SMTP config ────────────────────────────────────────────────────────────────
 
-const emailConfigured =
-  !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  from: string;
+}
 
-const transporter = emailConfigured
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+async function getSmtpConfig(): Promise<SmtpConfig | null> {
+  try {
+    const rows = await SystemSetting.findAll({
+      where: { key: ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_secure'] },
+    });
+    const db: Record<string, string> = {};
+    for (const row of rows) {
+      if (row.value !== null && row.value !== '') db[row.key] = row.value;
+    }
+
+    const host = db['smtp_host'] ?? process.env.SMTP_HOST ?? '';
+    const user = db['smtp_user'] ?? process.env.SMTP_USER ?? '';
+    const pass = db['smtp_pass'] ?? process.env.SMTP_PASS ?? '';
+
+    if (!host || !user || !pass) return null;
+
+    return {
+      host,
+      port: parseInt(db['smtp_port'] ?? process.env.SMTP_PORT ?? '587', 10),
+      secure: (db['smtp_secure'] ?? process.env.SMTP_SECURE ?? 'false') === 'true',
+      user,
+      pass,
+      from: db['smtp_from'] ?? process.env.SMTP_FROM ?? user,
+    };
+  } catch {
+    // DB not available; fall back to env vars only
+    const host = process.env.SMTP_HOST ?? '';
+    const user = process.env.SMTP_USER ?? '';
+    const pass = process.env.SMTP_PASS ?? '';
+    if (!host || !user || !pass) return null;
+    return {
+      host,
       port: parseInt(process.env.SMTP_PORT ?? '587', 10),
       secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-  : null;
+      user,
+      pass,
+      from: process.env.SMTP_FROM ?? user,
+    };
+  }
+}
+
+// ── Email ─────────────────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, payload: NotificationPayload): Promise<void> {
-  if (!transporter) return;
+  const cfg = await getSmtpConfig();
+  if (!cfg) return;
+
+  const transporter = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass },
+  });
 
   const time = payload.timestamp.toLocaleTimeString('en-GB', {
     hour: '2-digit',
@@ -40,7 +86,7 @@ async function sendEmail(to: string, payload: NotificationPayload): Promise<void
   });
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    from: cfg.from,
     to,
     subject: `Patient update — ${payload.patientName}`,
     text: [
@@ -145,7 +191,10 @@ export async function notifyFamilyContacts(
   return { email: emailsSent, sms: smsSent, errors };
 }
 
-export const notificationConfig = {
-  emailConfigured,
-  smsConfigured,
-};
+export async function getNotificationConfig(): Promise<{ emailConfigured: boolean; smsConfigured: boolean }> {
+  const smtpCfg = await getSmtpConfig();
+  return {
+    emailConfigured: smtpCfg !== null,
+    smsConfigured,
+  };
+}

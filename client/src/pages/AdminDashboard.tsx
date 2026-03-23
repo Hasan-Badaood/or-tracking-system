@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { reportsAPI, DailySummary, StageDurationRow, DateRangeRow, AuditLogRow } from '@/api/reports';
+import { settingsAPI, SmtpConfig } from '@/api/settings';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -102,6 +103,17 @@ export const AdminDashboard: React.FC = () => {
 
   // Settings: notification config
   const [notifConfig, setNotifConfig] = useState<{ emailConfigured: boolean; smsConfigured: boolean } | null>(null);
+
+  // Settings: SMTP form
+  const emptySmtpForm: SmtpConfig = { smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'false' };
+  const [smtpForm, setSmtpForm] = useState<SmtpConfig>(emptySmtpForm);
+  const [smtpLoading, setSmtpLoading] = useState(false);
+  const [smtpSaving, setSmtpSaving] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpSaveError, setSmtpSaveError] = useState('');
+  const [smtpSaveSuccess, setSmtpSaveSuccess] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<'ok' | 'fail' | null>(null);
+  const [smtpTestError, setSmtpTestError] = useState('');
 
   // Settings: stages management
   const [settingsStages, setSettingsStages] = useState<StageConfig[]>([]);
@@ -203,6 +215,11 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (section !== 'settings') return;
     reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
+    setSmtpLoading(true);
+    settingsAPI.getSmtp()
+      .then((cfg) => setSmtpForm(cfg))
+      .catch(() => {})
+      .finally(() => setSmtpLoading(false));
   }, [section]);
 
   const openAddStage = () => {
@@ -1487,58 +1504,164 @@ export const AdminDashboard: React.FC = () => {
 
               {/* Notifications */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-800">Notifications</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Family notification configuration status</p>
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-slate-800">Notifications</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">Email (SMTP) settings for family notifications</p>
+                  </div>
+                  {notifConfig !== null && (
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${notifConfig.emailConfigured ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {notifConfig.emailConfigured
+                        ? <CheckCircle2 className="h-3.5 w-3.5" />
+                        : <AlertCircle className="h-3.5 w-3.5" />
+                      }
+                      {notifConfig.emailConfigured ? 'Email active' : 'Email not configured'}
+                    </span>
+                  )}
                 </div>
                 <div className="px-5 py-5">
-                  {notifConfig === null ? (
-                    <div className="flex items-center justify-center py-4">
+                  {smtpLoading ? (
+                    <div className="flex items-center justify-center py-6">
                       <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className={`rounded-xl border p-4 ${notifConfig.emailConfigured ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {notifConfig.emailConfigured
-                            ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                            : <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-                          }
-                          <span className={`text-sm font-semibold ${notifConfig.emailConfigured ? 'text-emerald-700' : 'text-slate-500'}`}>
-                            Email — {notifConfig.emailConfigured ? 'configured' : 'not configured'}
-                          </span>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setSmtpSaving(true);
+                        setSmtpSaveError('');
+                        setSmtpSaveSuccess(false);
+                        setSmtpTestResult(null);
+                        try {
+                          await settingsAPI.updateSmtp(smtpForm);
+                          setSmtpSaveSuccess(true);
+                          // refresh notification status
+                          reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
+                          setTimeout(() => setSmtpSaveSuccess(false), 3000);
+                        } catch (err: any) {
+                          setSmtpSaveError(err?.response?.data?.error ?? 'Failed to save');
+                        } finally {
+                          setSmtpSaving(false);
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">SMTP host</label>
+                          <input
+                            value={smtpForm.smtp_host}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_host: e.target.value })}
+                            placeholder="smtp.example.com"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
                         </div>
-                        {!notifConfig.emailConfigured && (
-                          <div className="mt-1">
-                            <p className="text-xs text-slate-400 mb-1.5">Required environment variables:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].map((v) => (
-                                <code key={v} className="text-xs bg-white border border-slate-200 rounded px-1.5 py-0.5 font-mono text-slate-500">{v}</code>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">Port</label>
+                          <input
+                            value={smtpForm.smtp_port}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_port: e.target.value })}
+                            placeholder="587"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">Username</label>
+                          <input
+                            value={smtpForm.smtp_user}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_user: e.target.value })}
+                            placeholder="notifications@example.com"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">Password</label>
+                          <input
+                            type="password"
+                            value={smtpForm.smtp_pass}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_pass: e.target.value })}
+                            placeholder={notifConfig?.emailConfigured ? 'Leave blank to keep existing' : 'SMTP password'}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">From address</label>
+                          <input
+                            value={smtpForm.smtp_from}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_from: e.target.value })}
+                            placeholder="noreply@hospital.nhs.uk"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-slate-700">Encryption</label>
+                          <select
+                            value={smtpForm.smtp_secure}
+                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_secure: e.target.value })}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          >
+                            <option value="false">STARTTLS (port 587)</option>
+                            <option value="true">SSL/TLS (port 465)</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className={`rounded-xl border p-4 ${notifConfig.smsConfigured ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {notifConfig.smsConfigured
-                            ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                            : <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-                          }
-                          <span className={`text-sm font-semibold ${notifConfig.smsConfigured ? 'text-emerald-700' : 'text-slate-500'}`}>
-                            SMS — {notifConfig.smsConfigured ? 'configured' : 'not configured'}
-                          </span>
-                        </div>
-                        {!notifConfig.smsConfigured && (
-                          <div className="mt-1">
-                            <p className="text-xs text-slate-400 mb-1.5">Required environment variables:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER'].map((v) => (
-                                <code key={v} className="text-xs bg-white border border-slate-200 rounded px-1.5 py-0.5 font-mono text-slate-500">{v}</code>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+
+                      {smtpSaveError && (
+                        <p className="text-xs text-red-600">{smtpSaveError}</p>
+                      )}
+                      {smtpSaveSuccess && (
+                        <p className="text-xs text-emerald-600">Settings saved.</p>
+                      )}
+                      {smtpTestResult === 'ok' && (
+                        <p className="text-xs text-emerald-600">Connection successful.</p>
+                      )}
+                      {smtpTestResult === 'fail' && (
+                        <p className="text-xs text-red-600">Connection failed: {smtpTestError}</p>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="submit"
+                          disabled={smtpSaving}
+                          className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                        >
+                          {smtpSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={smtpTesting}
+                          onClick={async () => {
+                            setSmtpTesting(true);
+                            setSmtpTestResult(null);
+                            setSmtpTestError('');
+                            try {
+                              await settingsAPI.testSmtp();
+                              setSmtpTestResult('ok');
+                            } catch (err: any) {
+                              setSmtpTestResult('fail');
+                              setSmtpTestError(err?.response?.data?.error ?? 'Unknown error');
+                            } finally {
+                              setSmtpTesting(false);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        >
+                          {smtpTesting ? 'Testing…' : 'Test connection'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {notifConfig !== null && notifConfig.smsConfigured !== undefined && (
+                    <div className={`mt-6 rounded-xl border p-4 ${notifConfig.smsConfigured ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                      <div className="flex items-center gap-2">
+                        {notifConfig.smsConfigured
+                          ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          : <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
+                        }
+                        <span className={`text-sm font-semibold ${notifConfig.smsConfigured ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          SMS — {notifConfig.smsConfigured ? 'configured via Twilio env vars' : 'not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER)'}
+                        </span>
                       </div>
                     </div>
                   )}
