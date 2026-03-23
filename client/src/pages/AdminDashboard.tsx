@@ -650,8 +650,8 @@ export const AdminDashboard: React.FC = () => {
       <Navbar title={`Admin — ${sectionTitle}`} actions={refreshAction} />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-48 bg-slate-950 border-r border-slate-800 flex flex-col shrink-0">
+        {/* Sidebar — desktop only */}
+        <aside className="hidden md:flex w-48 bg-slate-950 border-r border-slate-800 flex-col shrink-0">
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navItems.map((item) => (
               <button
@@ -673,7 +673,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 pb-20 md:pb-6">
 
           {/* ── OVERVIEW ── */}
           {section === 'overview' && (
@@ -877,13 +877,13 @@ export const AdminDashboard: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Visit ID</TableHead>
+                      <TableHead className="hidden sm:table-cell font-semibold">Visit ID</TableHead>
                       <TableHead className="font-semibold">Patient</TableHead>
-                      <TableHead className="font-semibold">MRN</TableHead>
+                      <TableHead className="hidden md:table-cell font-semibold">MRN</TableHead>
                       <TableHead className="font-semibold">Stage</TableHead>
-                      <TableHead className="font-semibold">OR Room</TableHead>
-                      <TableHead className="font-semibold">Time in Stage</TableHead>
-                      <TableHead className="font-semibold">Arrived</TableHead>
+                      <TableHead className="hidden sm:table-cell font-semibold">OR Room</TableHead>
+                      <TableHead className="hidden lg:table-cell font-semibold">Time in Stage</TableHead>
+                      <TableHead className="hidden md:table-cell font-semibold">Arrived</TableHead>
                       <TableHead />
                     </TableRow>
                   </TableHeader>
@@ -897,9 +897,9 @@ export const AdminDashboard: React.FC = () => {
                     ) : (
                       activeVisits.map((visit) => (
                         <TableRow key={visit.id} className="hover:bg-gray-50">
-                          <TableCell className="font-mono text-xs text-gray-600">{visit.visit_tracking_id}</TableCell>
+                          <TableCell className="hidden sm:table-cell font-mono text-xs text-gray-600">{visit.visit_tracking_id}</TableCell>
                           <TableCell className="font-medium">{visit.patient.first_name} {visit.patient.last_name}</TableCell>
-                          <TableCell className="text-gray-500 text-sm">{visit.patient.mrn}</TableCell>
+                          <TableCell className="hidden md:table-cell text-gray-500 text-sm">{visit.patient.mrn}</TableCell>
                           <TableCell>
                             <Badge
                               className="text-white text-xs font-medium"
@@ -908,9 +908,9 @@ export const AdminDashboard: React.FC = () => {
                               {visit.current_stage.name}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-gray-500">{visit.or_room?.name ?? '—'}</TableCell>
-                          <TableCell className="text-sm text-gray-600">{timeInStage(visit.updated_at)}</TableCell>
-                          <TableCell className="text-sm text-gray-500">
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{visit.or_room?.name ?? '—'}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-sm text-gray-600">{timeInStage(visit.updated_at)}</TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-gray-500">
                             {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </TableCell>
                           <TableCell>
@@ -1233,11 +1233,11 @@ export const AdminDashboard: React.FC = () => {
                       <thead>
                         <tr className="border-b border-slate-100">
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Time</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Visit</th>
+                          <th className="hidden sm:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Visit</th>
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Patient</th>
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Transition</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">By</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Notes</th>
+                          <th className="hidden md:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">By</th>
+                          <th className="hidden lg:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Notes</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1246,7 +1246,7 @@ export const AdminDashboard: React.FC = () => {
                             <td className="px-5 py-3 text-xs text-slate-500 whitespace-nowrap tabular-nums">
                               {new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             </td>
-                            <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.visit_tracking_id ?? '—'}</td>
+                            <td className="hidden sm:table-cell px-5 py-3 font-mono text-xs text-slate-500">{row.visit_tracking_id ?? '—'}</td>
                             <td className="px-5 py-3 text-slate-700 text-xs">{row.patient_name ?? '—'}</td>
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -1263,12 +1263,12 @@ export const AdminDashboard: React.FC = () => {
                                 )}
                               </div>
                             </td>
-                            <td className="px-5 py-3 text-xs text-slate-500">
+                            <td className="hidden md:table-cell px-5 py-3 text-xs text-slate-500">
                               {row.updated_by ? (
                                 <span>{row.updated_by.name} <span className="text-slate-400">({row.updated_by.role})</span></span>
                               ) : '—'}
                             </td>
-                            <td className="px-5 py-3 text-xs text-slate-400 max-w-xs truncate">{row.notes ?? '—'}</td>
+                            <td className="hidden lg:table-cell px-5 py-3 text-xs text-slate-400 max-w-xs truncate">{row.notes ?? '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1424,9 +1424,9 @@ export const AdminDashboard: React.FC = () => {
                         <tr className="border-b border-slate-100">
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Date</th>
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Action</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Performed by</th>
+                          <th className="hidden sm:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Performed by</th>
                           <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Target user</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Changes</th>
+                          <th className="hidden md:table-cell text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Changes</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1446,13 +1446,13 @@ export const AdminDashboard: React.FC = () => {
                                 {row.action.replace('_', ' ')}
                               </span>
                             </td>
-                            <td className="px-5 py-3 text-slate-700 text-xs">
+                            <td className="hidden sm:table-cell px-5 py-3 text-slate-700 text-xs">
                               {row.performed_by ? `${row.performed_by.name} (${row.performed_by.username})` : '—'}
                             </td>
                             <td className="px-5 py-3 text-slate-700 text-xs">
                               {row.target_user ? `${row.target_user.name} (${row.target_user.username})` : '—'}
                             </td>
-                            <td className="px-5 py-3 text-xs text-slate-500 max-w-xs truncate">
+                            <td className="hidden md:table-cell px-5 py-3 text-xs text-slate-500 max-w-xs truncate">
                               {row.changes
                                 ? Object.entries(row.changes).map(([k, v]) =>
                                     k === 'password' ? 'password changed' : `${k}: ${v.to}`
@@ -1947,6 +1947,22 @@ export const AdminDashboard: React.FC = () => {
         </main>
       </div>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 flex z-50">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setSection(item.id as Section)}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+              section === item.id ? 'text-blue-400' : 'text-slate-500'
+            }`}
+          >
+            {item.icon}
+            <span className="leading-tight">{item.label.split(' ')[0]}</span>
+          </button>
+        ))}
+      </nav>
 
       {/* Create user dialog */}
       <Dialog open={userDialog} onOpenChange={(open) => { setUserDialog(open); if (!open) { setUserForm(emptyUserForm); setUserFormError(''); } }}>

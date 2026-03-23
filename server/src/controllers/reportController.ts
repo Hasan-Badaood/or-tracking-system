@@ -273,7 +273,7 @@ export const getAuditLog = async (req: Request, res: Response) => {
 
     const rows = events.rows.map((e: any) => ({
       id: e.id,
-      created_at: e.created_at,
+      created_at: e.createdAt ?? e.created_at,
       visit_tracking_id: e.visit?.visit_tracking_id ?? null,
       patient_name: e.visit?.patient
         ? `${e.visit.patient.first_name} ${e.visit.patient.last_name}`
