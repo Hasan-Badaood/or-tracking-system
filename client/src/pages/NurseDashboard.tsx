@@ -91,8 +91,10 @@ export const NurseDashboard: React.FC = () => {
     try {
       await roomsAPI.completeCleaning(roomId);
       await fetchRooms();
-    } catch { /* keep existing */ }
-    finally { setUpdatingRoom(null); }
+    } catch (err: any) {
+      console.error('Complete cleaning failed:', err?.response?.data?.error ?? err);
+      await fetchRooms();
+    } finally { setUpdatingRoom(null); }
   };
 
   const handleScan = (result: string) => {

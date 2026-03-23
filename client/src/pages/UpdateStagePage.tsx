@@ -118,7 +118,7 @@ export const UpdateStagePage: React.FC = () => {
 
   const availableRooms = rooms.filter((r) => r.status === 'Available');
   const needsRoom = selectedStageId
-    ? stages.find((s) => s.id === selectedStageId)?.name === 'In Theatre'
+    ? stages.find((s) => s.id === selectedStageId)?.name.trim().toLowerCase() === 'in theatre'
     : false;
 
   const formatTime = (dateStr: string) => {
@@ -256,37 +256,39 @@ export const UpdateStagePage: React.FC = () => {
 
         {/* OR Room and Notes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Assign OR Room */}
-          <Card className={needsRoom && !selectedRoomId ? 'border-red-400' : ''}>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-1">
-                Assign OR Room
-                {needsRoom
-                  ? <span className="ml-2 text-sm font-semibold text-red-600">* required</span>
-                  : <span className="ml-2 text-sm font-normal text-gray-500">(optional)</span>
-                }
-              </h3>
-              {needsRoom && !selectedRoomId && (
-                <p className="text-xs text-red-500 mb-3">Select an available room to continue.</p>
-              )}
-              {!needsRoom && <div className="mb-3" />}
-              <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
-                <SelectTrigger className={`w-full ${needsRoom && !selectedRoomId ? 'border-red-400 focus:ring-red-300' : ''}`}>
-                  <SelectValue placeholder="Select OR Room..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRooms.map((room) => (
-                    <SelectItem key={room.id} value={String(room.id)}>
-                      {room.name} — Available
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {availableRooms.length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">No rooms currently available</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* Assign OR Room — only shown when moving to In Theatre */}
+          {needsRoom && (
+            <Card className={!selectedRoomId ? 'border-red-400' : ''}>
+              <CardContent className="pt-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-1">
+                  Assign OR Room
+                  <span className="ml-2 text-sm font-semibold text-red-600">* required</span>
+                </h3>
+                {!selectedRoomId && (
+                  <p className="text-xs text-red-500 mb-3">Select an available room to continue.</p>
+                )}
+                {selectedRoomId && <div className="mb-3" />}
+                <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
+                  <SelectTrigger className={`w-full ${!selectedRoomId ? 'border-red-400 focus:ring-red-300' : ''}`}>
+                    <SelectValue placeholder="Select OR Room..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((room) => (
+                      <SelectItem key={room.id} value={String(room.id)}>
+                        {room.name} — Available
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableRooms.length === 0 && (
+                  <p className="text-sm text-red-600 font-medium mt-2">
+                    No rooms are currently available — all rooms are occupied or being cleaned.
+                    Stage cannot be changed to In Theatre until a room is free.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Notes */}
           <Card>

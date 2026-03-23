@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { reportsAPI, DailySummary, StageDurationRow, DateRangeRow, AuditLogRow } from '@/api/reports';
-import { settingsAPI, SmtpConfig } from '@/api/settings';
+import { settingsAPI, SmtpConfig, ResendConfig } from '@/api/settings';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -16,7 +16,7 @@ import {
 import { visitsAPI, Visit } from '@/api/visits';
 import { roomsAPI, Room } from '@/api/rooms';
 import { stagesAPI, Stage as StageConfig } from '@/api/stages';
-import { usersAPI, StaffUser } from '@/api/users';
+import { usersAPI, StaffUser, UserAuditRow } from '@/api/users';
 import { Navbar } from '@/components/layout/Navbar';
 import {
   Dialog,
@@ -109,11 +109,23 @@ export const AdminDashboard: React.FC = () => {
   const [smtpForm, setSmtpForm] = useState<SmtpConfig>(emptySmtpForm);
   const [smtpLoading, setSmtpLoading] = useState(false);
   const [smtpSaving, setSmtpSaving] = useState(false);
-  const [smtpTesting, setSmtpTesting] = useState(false);
   const [smtpSaveError, setSmtpSaveError] = useState('');
   const [smtpSaveSuccess, setSmtpSaveSuccess] = useState(false);
-  const [smtpTestResult, setSmtpTestResult] = useState<'ok' | 'fail' | null>(null);
-  const [smtpTestError, setSmtpTestError] = useState('');
+
+  // Settings: Resend form
+  const emptyResendForm: ResendConfig = { resend_api_key: '', resend_from: '' };
+  const [resendForm, setResendForm] = useState<ResendConfig>(emptyResendForm);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSaving, setResendSaving] = useState(false);
+  const [resendTesting, setResendTesting] = useState(false);
+  const [resendSaveError, setResendSaveError] = useState('');
+  const [resendSaveSuccess, setResendSaveSuccess] = useState(false);
+  const [resendTestResult, setResendTestResult] = useState<'ok' | 'fail' | null>(null);
+  const [resendTestError, setResendTestError] = useState('');
+  const [resendTestEmail, setResendTestEmail] = useState('');
+  const [resendSendingTest, setResendSendingTest] = useState(false);
+  const [resendSendTestResult, setResendSendTestResult] = useState<'ok' | 'fail' | null>(null);
+  const [resendSendTestError, setResendSendTestError] = useState('');
 
   // Settings: stages management
   const [settingsStages, setSettingsStages] = useState<StageConfig[]>([]);
@@ -134,6 +146,22 @@ export const AdminDashboard: React.FC = () => {
   const [userFormError, setUserFormError] = useState('');
   const [savingUser, setSavingUser] = useState(false);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+
+  // Edit user dialog
+  const emptyEditForm = { name: '', username: '', email: '', role: '', new_password: '' };
+  const [editUserDialog, setEditUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [editFormError, setEditFormError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [sendingCredentials, setSendingCredentials] = useState(false);
+  const [credentialsSent, setCredentialsSent] = useState(false);
+  const [credentialsError, setCredentialsError] = useState('');
+
+  // User audit log
+  const [userAuditRows, setUserAuditRows] = useState<UserAuditRow[]>([]);
+  const [userAuditTotal, setUserAuditTotal] = useState(0);
+  const [userAuditLoading, setUserAuditLoading] = useState(false);
 
   // Audit log
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
@@ -215,6 +243,11 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (section !== 'settings') return;
     reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
+    setResendLoading(true);
+    settingsAPI.getResend()
+      .then((cfg) => setResendForm(cfg))
+      .catch(() => {})
+      .finally(() => setResendLoading(false));
     setSmtpLoading(true);
     settingsAPI.getSmtp()
       .then((cfg) => setSmtpForm(cfg))
@@ -320,8 +353,24 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (section === 'users') loadStaffUsers();
-  }, [section, loadStaffUsers]);
+    if (section === 'users') {
+      loadStaffUsers();
+      loadUserAuditLog();
+    }
+  }, [section, loadStaffUsers]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadUserAuditLog = async () => {
+    setUserAuditLoading(true);
+    try {
+      const data = await usersAPI.getAuditLog(50, 0);
+      setUserAuditRows(data.rows);
+      setUserAuditTotal(data.total);
+    } catch {
+      // keep existing
+    } finally {
+      setUserAuditLoading(false);
+    }
+  };
 
   const loadAuditLog = useCallback(async (offset: number) => {
     setAuditLoading(true);
@@ -372,6 +421,63 @@ export const AdminDashboard: React.FC = () => {
       // failed silently
     } finally {
       setTogglingUserId(null);
+    }
+  };
+
+  const openEditUser = (u: StaffUser) => {
+    setEditingUser(u);
+    setEditForm({ name: u.name, username: u.username, email: u.email ?? '', role: u.role, new_password: '' });
+    setEditFormError('');
+    setCredentialsSent(false);
+    setCredentialsError('');
+    setEditUserDialog(true);
+  };
+
+  const handleSendCredentials = async () => {
+    if (!editingUser || !editForm.new_password) return;
+    setSendingCredentials(true);
+    setCredentialsError('');
+    setCredentialsSent(false);
+    try {
+      const loginUrl = window.location.origin + '/login';
+      await usersAPI.sendCredentials(editingUser.id, editForm.new_password, loginUrl);
+      setCredentialsSent(true);
+    } catch (err: any) {
+      setCredentialsError(err.response?.data?.error || 'Failed to send email.');
+    } finally {
+      setSendingCredentials(false);
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditFormError('');
+    if (!editForm.name.trim() || !editForm.username.trim() || !editForm.role) {
+      setEditFormError('Name, username, and role are required.');
+      return;
+    }
+    if (editForm.new_password && editForm.new_password.length < 6) {
+      setEditFormError('New password must be at least 6 characters.');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, any> = {
+        name: editForm.name.trim(),
+        username: editForm.username.trim(),
+        email: editForm.email.trim() || null,
+        role: editForm.role,
+      };
+      if (editForm.new_password) payload.new_password = editForm.new_password;
+      const updated = await usersAPI.update(editingUser.id, payload);
+      setStaffUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      setEditUserDialog(false);
+      loadUserAuditLog();
+    } catch (err: any) {
+      setEditFormError(err.response?.data?.error || 'Failed to save changes.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1267,20 +1373,92 @@ export const AdminDashboard: React.FC = () => {
                               </span>
                             </td>
                             <td className="px-5 py-3.5 text-right">
-                              <button
-                                onClick={() => handleToggleUser(u)}
-                                disabled={togglingUserId === u.id}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 border ${
-                                  u.active
-                                    ? 'text-red-600 border-red-200 hover:bg-red-50'
-                                    : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
-                                }`}
-                              >
-                                {togglingUserId === u.id
-                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  : u.active ? 'Deactivate' : 'Activate'
-                                }
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => openEditUser(u)}
+                                  title="Edit user"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleUser(u)}
+                                  disabled={togglingUserId === u.id}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 border ${
+                                    u.active
+                                      ? 'text-red-600 border-red-200 hover:bg-red-50'
+                                      : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  {togglingUserId === u.id
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : u.active ? 'Deactivate' : 'Activate'
+                                  }
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* User audit log */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <h2 className="font-semibold text-slate-800">User management log</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">{userAuditTotal} event{userAuditTotal !== 1 ? 's' : ''} recorded</p>
+                </div>
+                {userAuditLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+                  </div>
+                ) : userAuditRows.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 text-sm">No user changes recorded yet.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Date</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Action</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Performed by</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Target user</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Changes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {userAuditRows.map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-xs text-slate-500 whitespace-nowrap">
+                              {new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border capitalize ${
+                                row.action === 'create'          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                row.action === 'deactivate'      ? 'bg-red-50 text-red-700 border-red-200' :
+                                row.action === 'activate'        ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                row.action === 'password_reset'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                'bg-slate-50 text-slate-600 border-slate-200'
+                              }`}>
+                                {row.action.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-slate-700 text-xs">
+                              {row.performed_by ? `${row.performed_by.name} (${row.performed_by.username})` : '—'}
+                            </td>
+                            <td className="px-5 py-3 text-slate-700 text-xs">
+                              {row.target_user ? `${row.target_user.name} (${row.target_user.username})` : '—'}
+                            </td>
+                            <td className="px-5 py-3 text-xs text-slate-500 max-w-xs truncate">
+                              {row.changes
+                                ? Object.entries(row.changes).map(([k, v]) =>
+                                    k === 'password' ? 'password changed' : `${k}: ${v.to}`
+                                  ).join(', ')
+                                : '—'
+                              }
                             </td>
                           </tr>
                         ))}
@@ -1507,7 +1685,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h2 className="font-semibold text-slate-800">Notifications</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Email (SMTP) settings for family notifications</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Resend API settings for family email notifications</p>
                   </div>
                   {notifConfig !== null && (
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${notifConfig.emailConfigured ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -1519,8 +1697,10 @@ export const AdminDashboard: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="px-5 py-5">
-                  {smtpLoading ? (
+                <div className="px-5 py-5 space-y-6">
+
+                  {/* ── Resend form ── */}
+                  {resendLoading ? (
                     <div className="flex items-center justify-center py-6">
                       <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
                     </div>
@@ -1528,129 +1708,222 @@ export const AdminDashboard: React.FC = () => {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        setSmtpSaving(true);
-                        setSmtpSaveError('');
-                        setSmtpSaveSuccess(false);
-                        setSmtpTestResult(null);
+                        setResendSaving(true);
+                        setResendSaveError('');
+                        setResendSaveSuccess(false);
+                        setResendTestResult(null);
                         try {
-                          await settingsAPI.updateSmtp(smtpForm);
-                          setSmtpSaveSuccess(true);
-                          // refresh notification status
+                          await settingsAPI.updateResend(resendForm);
+                          setResendSaveSuccess(true);
                           reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
-                          setTimeout(() => setSmtpSaveSuccess(false), 3000);
+                          setTimeout(() => setResendSaveSuccess(false), 3000);
                         } catch (err: any) {
-                          setSmtpSaveError(err?.response?.data?.error ?? 'Failed to save');
+                          setResendSaveError(err?.response?.data?.error ?? 'Failed to save');
                         } finally {
-                          setSmtpSaving(false);
+                          setResendSaving(false);
                         }
                       }}
                       className="space-y-4"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-slate-700">SMTP host</label>
-                          <input
-                            value={smtpForm.smtp_host}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_host: e.target.value })}
-                            placeholder="smtp.example.com"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-slate-700">Port</label>
-                          <input
-                            value={smtpForm.smtp_port}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_port: e.target.value })}
-                            placeholder="587"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-slate-700">Username</label>
-                          <input
-                            value={smtpForm.smtp_user}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_user: e.target.value })}
-                            placeholder="notifications@example.com"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-slate-700">Password</label>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-sm font-medium text-slate-700">API key</label>
                           <input
                             type="password"
-                            value={smtpForm.smtp_pass}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_pass: e.target.value })}
-                            placeholder={notifConfig?.emailConfigured ? 'Leave blank to keep existing' : 'SMTP password'}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            value={resendForm.resend_api_key}
+                            onChange={(e) => setResendForm({ ...resendForm, resend_api_key: e.target.value })}
+                            placeholder={notifConfig?.emailConfigured ? 'Leave blank to keep existing' : 're_xxxxxxxxxxxxxxxxxxxx'}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
                           />
+                          <p className="text-xs text-slate-400">Get your API key from resend.com/api-keys</p>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 sm:col-span-2">
                           <label className="text-sm font-medium text-slate-700">From address</label>
                           <input
-                            value={smtpForm.smtp_from}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_from: e.target.value })}
-                            placeholder="noreply@hospital.nhs.uk"
+                            value={resendForm.resend_from}
+                            onChange={(e) => setResendForm({ ...resendForm, resend_from: e.target.value })}
+                            placeholder="OR Tracker <noreply@yourdomain.com>"
                             className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-slate-700">Encryption</label>
-                          <select
-                            value={smtpForm.smtp_secure}
-                            onChange={(e) => setSmtpForm({ ...smtpForm, smtp_secure: e.target.value })}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                          >
-                            <option value="false">STARTTLS (port 587)</option>
-                            <option value="true">SSL/TLS (port 465)</option>
-                          </select>
+                          <p className="text-xs text-slate-400">Must be from a domain verified in your Resend account</p>
                         </div>
                       </div>
 
-                      {smtpSaveError && (
-                        <p className="text-xs text-red-600">{smtpSaveError}</p>
-                      )}
-                      {smtpSaveSuccess && (
-                        <p className="text-xs text-emerald-600">Settings saved.</p>
-                      )}
-                      {smtpTestResult === 'ok' && (
-                        <p className="text-xs text-emerald-600">Connection successful.</p>
-                      )}
-                      {smtpTestResult === 'fail' && (
-                        <p className="text-xs text-red-600">Connection failed: {smtpTestError}</p>
-                      )}
+                      {resendSaveError && <p className="text-xs text-red-600">{resendSaveError}</p>}
+                      {resendSaveSuccess && <p className="text-xs text-emerald-600">Settings saved.</p>}
+                      {resendTestResult === 'ok' && <p className="text-xs text-emerald-600">API key is valid.</p>}
+                      {resendTestResult === 'fail' && <p className="text-xs text-red-600">Failed: {resendTestError}</p>}
 
                       <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="submit"
+                          disabled={resendSaving}
+                          className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                        >
+                          {resendSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={resendTesting}
+                          onClick={async () => {
+                            setResendTesting(true);
+                            setResendTestResult(null);
+                            setResendTestError('');
+                            try {
+                              await settingsAPI.testResend();
+                              setResendTestResult('ok');
+                            } catch (err: any) {
+                              setResendTestResult('fail');
+                              setResendTestError(err?.response?.data?.error ?? 'Unknown error');
+                            } finally {
+                              setResendTesting(false);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        >
+                          {resendTesting ? 'Testing…' : 'Test API key'}
+                        </button>
+                      </div>
+
+                      {/* Send test email */}
+                      <div className="pt-3 border-t border-slate-100">
+                        <p className="text-xs font-medium text-slate-600 mb-2">Send a test email</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            value={resendTestEmail}
+                            onChange={(e) => { setResendTestEmail(e.target.value); setResendSendTestResult(null); }}
+                            placeholder="your@email.com"
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                          <button
+                            type="button"
+                            disabled={resendSendingTest || !resendTestEmail.trim()}
+                            onClick={async () => {
+                              setResendSendingTest(true);
+                              setResendSendTestResult(null);
+                              setResendSendTestError('');
+                              try {
+                                await settingsAPI.sendTestEmail(resendTestEmail.trim());
+                                setResendSendTestResult('ok');
+                              } catch (err: any) {
+                                setResendSendTestResult('fail');
+                                setResendSendTestError(err?.response?.data?.error ?? 'Unknown error');
+                              } finally {
+                                setResendSendingTest(false);
+                              }
+                            }}
+                            className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+                          >
+                            {resendSendingTest ? 'Sending…' : 'Send'}
+                          </button>
+                        </div>
+                        {resendSendTestResult === 'ok' && <p className="text-xs text-emerald-600 mt-1.5">Test email sent — check your inbox.</p>}
+                        {resendSendTestResult === 'fail' && <p className="text-xs text-red-600 mt-1.5">{resendSendTestError}</p>}
+                        <p className="text-xs text-slate-400 mt-1">With onboarding@resend.dev, emails only deliver to your Resend account email.</p>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* SMTP fallback */}
+                  <div className="pt-6 border-t border-slate-100">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">SMTP fallback (e.g. Gmail)</p>
+                    {smtpLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                      </div>
+                    ) : (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setSmtpSaving(true);
+                          setSmtpSaveError('');
+                          setSmtpSaveSuccess(false);
+                          try {
+                            await settingsAPI.updateSmtp(smtpForm);
+                            setSmtpSaveSuccess(true);
+                            reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
+                            setTimeout(() => setSmtpSaveSuccess(false), 3000);
+                          } catch (err: any) {
+                            setSmtpSaveError(err?.response?.data?.error ?? 'Failed to save');
+                          } finally {
+                            setSmtpSaving(false);
+                          }
+                        }}
+                        className="space-y-4"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Host</label>
+                            <input
+                              value={smtpForm.smtp_host}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_host: e.target.value })}
+                              placeholder="smtp.gmail.com"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Port</label>
+                            <input
+                              value={smtpForm.smtp_port}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_port: e.target.value })}
+                              placeholder="587"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Username</label>
+                            <input
+                              value={smtpForm.smtp_user}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_user: e.target.value })}
+                              placeholder="you@gmail.com"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Password / App password</label>
+                            <input
+                              type="password"
+                              value={smtpForm.smtp_pass}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_pass: e.target.value })}
+                              placeholder={notifConfig?.emailConfigured ? 'Leave blank to keep existing' : 'App password'}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">From address</label>
+                            <input
+                              value={smtpForm.smtp_from}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_from: e.target.value })}
+                              placeholder="noreply@hospital.nhs.uk"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Encryption</label>
+                            <select
+                              value={smtpForm.smtp_secure}
+                              onChange={(e) => setSmtpForm({ ...smtpForm, smtp_secure: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            >
+                              <option value="false">STARTTLS (port 587)</option>
+                              <option value="true">SSL/TLS (port 465)</option>
+                            </select>
+                          </div>
+                        </div>
+                        {smtpSaveError && <p className="text-xs text-red-600">{smtpSaveError}</p>}
+                        {smtpSaveSuccess && <p className="text-xs text-emerald-600">SMTP settings saved.</p>}
+                        <p className="text-xs text-slate-400">Used only if no Resend API key is set. On deployed servers (e.g. Render) Gmail SMTP works fine.</p>
                         <button
                           type="submit"
                           disabled={smtpSaving}
                           className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
                         >
-                          {smtpSaving ? 'Saving…' : 'Save'}
+                          {smtpSaving ? 'Saving…' : 'Save SMTP'}
                         </button>
-                        <button
-                          type="button"
-                          disabled={smtpTesting}
-                          onClick={async () => {
-                            setSmtpTesting(true);
-                            setSmtpTestResult(null);
-                            setSmtpTestError('');
-                            try {
-                              await settingsAPI.testSmtp();
-                              setSmtpTestResult('ok');
-                            } catch (err: any) {
-                              setSmtpTestResult('fail');
-                              setSmtpTestError(err?.response?.data?.error ?? 'Unknown error');
-                            } finally {
-                              setSmtpTesting(false);
-                            }
-                          }}
-                          className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                        >
-                          {smtpTesting ? 'Testing…' : 'Test connection'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                      </form>
+                    )}
+                  </div>
 
                   {notifConfig !== null && notifConfig.smsConfigured !== undefined && (
                     <div className={`mt-6 rounded-xl border p-4 ${notifConfig.smsConfigured ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
@@ -1750,6 +2023,106 @@ export const AdminDashboard: React.FC = () => {
               >
                 {savingUser && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Create
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit user dialog */}
+      <Dialog open={editUserDialog} onOpenChange={(open) => { setEditUserDialog(open); if (!open) setEditingUser(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit staff account</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Full name</label>
+              <input
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Username</label>
+              <input
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Email (optional)</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Role</label>
+              <Select value={editForm.role} onValueChange={(val) => setEditForm({ ...editForm, role: val })}>
+                <SelectTrigger className="bg-slate-50 border-slate-200">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nurse">Nurse</SelectItem>
+                  <SelectItem value="reception">Reception</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">New password <span className="text-slate-400 font-normal">(leave blank to keep existing)</span></label>
+              <input
+                type="password"
+                value={editForm.new_password}
+                onChange={(e) => { setEditForm({ ...editForm, new_password: e.target.value }); setCredentialsSent(false); setCredentialsError(''); }}
+                placeholder="Min. 6 characters"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+            {editForm.new_password && editForm.email && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-600 leading-tight">
+                  <span className="font-medium">Send login details</span>
+                  <span className="text-slate-400"> — email credentials to {editForm.email}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendCredentials}
+                  disabled={sendingCredentials || credentialsSent}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 border border-slate-300 text-slate-700 hover:bg-white flex items-center gap-1.5"
+                >
+                  {sendingCredentials && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {credentialsSent ? 'Sent' : 'Send email'}
+                </button>
+              </div>
+            )}
+            {editForm.new_password && !editForm.email && (
+              <p className="text-xs text-slate-400">No email address set — add one above to send login details.</p>
+            )}
+            {credentialsError && <p className="text-xs text-red-600">{credentialsError}</p>}
+            {editFormError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-lg">{editFormError}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditUserDialog(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingEdit && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Save changes
               </button>
             </div>
           </form>

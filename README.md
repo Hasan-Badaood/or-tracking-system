@@ -149,6 +149,52 @@ Suggested order:
 
 ---
 
+## Email setup
+
+Email is used for two things: sending OTP codes to family contacts via the family portal, and sending login credentials to staff when an admin resets their password.
+
+The system tries each provider in order and uses the first one that is configured:
+
+1. Resend (API key set in Admin → Settings → Notifications)
+2. SMTP (credentials set in the same settings page)
+3. Console log — prints the message to the server console, no email is sent (development fallback)
+
+Both options are configured through the admin UI at runtime, no environment variables needed.
+
+### Option A — Resend (recommended)
+
+Resend works on all hosting platforms including localhost. The free tier covers 3,000 emails per month.
+
+1. Sign up at resend.com
+2. Go to API Keys and create a new key
+3. Copy the key — it starts with `re_`
+4. Go to Domains and add your sending domain, then follow the DNS verification steps
+5. Once verified, use an address from that domain as the From address (e.g. `noreply@yourdomain.com`)
+6. Paste the API key and From address into Admin → Settings → Notifications and save
+
+Without a verified domain you can only use `onboarding@resend.dev` as the sender, which only delivers to the email address registered on your Resend account.
+
+### Option B — Gmail SMTP
+
+SMTP works well on deployed servers such as Render. It may time out on some local networks that block outbound port 587.
+
+Gmail requires an App Password — your normal account password will not work.
+
+1. Enable 2-Step Verification on your Google account (required before App Passwords are available)
+2. Go to Google Account → Security → App Passwords
+3. Create a new app password, select Mail as the app
+4. Copy the 16-character password that is generated
+5. In Admin → Settings → Notifications, fill in the SMTP fields:
+   - Host: `smtp.gmail.com`
+   - Port: `587`
+   - Encryption: STARTTLS
+   - Username: your full Gmail address
+   - Password: the 16-character app password (not your Google account password)
+   - From address: your Gmail address or `Your Name <you@gmail.com>`
+6. Save and use the Test connection button to verify it works
+
+---
+
 Project developed 2026 for University of Hertfordshire.
 
 Author: Hasan Badaood — hb25abz@herts.ac.uk

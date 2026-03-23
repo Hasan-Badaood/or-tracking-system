@@ -9,6 +9,11 @@ export interface SmtpConfig {
   smtp_secure: string;
 }
 
+export interface ResendConfig {
+  resend_api_key: string;
+  resend_from: string;
+}
+
 export const settingsAPI = {
   getSmtp: async (): Promise<SmtpConfig> => {
     const response = await apiClient.get('/settings/smtp');
@@ -20,6 +25,23 @@ export const settingsAPI = {
   },
 
   testSmtp: async (): Promise<void> => {
-    await apiClient.post('/settings/smtp/test');
+    await apiClient.post('/settings/smtp/test', {}, { timeout: 15_000 });
+  },
+
+  getResend: async (): Promise<ResendConfig> => {
+    const response = await apiClient.get('/settings/resend');
+    return response.data.config;
+  },
+
+  updateResend: async (config: Partial<ResendConfig>): Promise<void> => {
+    await apiClient.put('/settings/resend', config);
+  },
+
+  testResend: async (): Promise<void> => {
+    await apiClient.post('/settings/resend/test', {}, { timeout: 10_000 });
+  },
+
+  sendTestEmail: async (to: string): Promise<void> => {
+    await apiClient.post('/settings/resend/send-test', { to }, { timeout: 15_000 });
   },
 };
