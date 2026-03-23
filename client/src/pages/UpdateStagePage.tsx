@@ -66,6 +66,12 @@ export const UpdateStagePage: React.FC = () => {
 
   const handleUpdate = async () => {
     if (!visit || !selectedStageId) return;
+
+    if (needsRoom && !selectedRoomId) {
+      setError('An OR room must be assigned before moving the patient to In Theatre.');
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -78,7 +84,7 @@ export const UpdateStagePage: React.FC = () => {
       );
       navigate(-1);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update stage');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to update stage');
       setSaving(false);
     }
   };
@@ -251,19 +257,27 @@ export const UpdateStagePage: React.FC = () => {
         {/* OR Room and Notes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Assign OR Room */}
-          <Card>
+          <Card className={needsRoom && !selectedRoomId ? 'border-red-400' : ''}>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">
-                Assign OR Room {needsRoom ? '(required for In Theatre)' : '(optional)'}:
+              <h3 className="text-lg font-bold text-gray-800 mb-1">
+                Assign OR Room
+                {needsRoom
+                  ? <span className="ml-2 text-sm font-semibold text-red-600">* required</span>
+                  : <span className="ml-2 text-sm font-normal text-gray-500">(optional)</span>
+                }
               </h3>
+              {needsRoom && !selectedRoomId && (
+                <p className="text-xs text-red-500 mb-3">Select an available room to continue.</p>
+              )}
+              {!needsRoom && <div className="mb-3" />}
               <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={`w-full ${needsRoom && !selectedRoomId ? 'border-red-400 focus:ring-red-300' : ''}`}>
                   <SelectValue placeholder="Select OR Room..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableRooms.map((room) => (
                     <SelectItem key={room.id} value={String(room.id)}>
-                      {room.name} - Available
+                      {room.name} — Available
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -367,7 +381,7 @@ export const UpdateStagePage: React.FC = () => {
             <Button
               size="lg"
               onClick={handleUpdate}
-              disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id}
+              disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id || (needsRoom && !selectedRoomId)}
               className="px-8 bg-green-600 hover:bg-green-700 text-white"
             >
               {saving ? (

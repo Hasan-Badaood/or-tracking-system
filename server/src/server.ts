@@ -12,7 +12,9 @@ import userRoutes from './routes/users';
 import reportRoutes from './routes/reports';
 import barcodeRoutes from './routes/barcode';
 import seedRoutes from './routes/seed';
+import settingsRoutes from './routes/settings';
 import { generalApiRateLimit } from './middleware/rateLimit';
+import { startCleaningScheduler } from './services/cleaningScheduler';
 
 dotenv.config();
 
@@ -43,6 +45,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/seed', seedRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -74,6 +77,8 @@ const startServer = async () => {
 
     await sequelize.sync();
     console.log('Database synchronized.');
+
+    startCleaningScheduler();
 
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
