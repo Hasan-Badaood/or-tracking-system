@@ -9,6 +9,7 @@ import { CleaningTimer } from './CleaningTimer';
 import { FamilyToken } from './FamilyToken';
 import { BlacklistedToken } from './BlacklistedToken';
 import { SystemSetting } from './SystemSetting';
+import { UserAuditLog } from './UserAuditLog';
 
 // Define all relationships
 Visit.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
@@ -45,4 +46,5 @@ export {
   FamilyToken,
   BlacklistedToken,
   SystemSetting,
+  UserAuditLog,
 };
