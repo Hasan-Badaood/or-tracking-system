@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Visit, Stage, StageEvent, ORRoom, User, FamilyContact, Patient } from '../models';
+import { CleaningTimer } from '../models/CleaningTimer';
 import { sequelize } from '../config/database';
 import { notifyFamilyContacts } from '../services/notificationService';
 
@@ -78,6 +79,15 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // OR room is mandatory when moving to "In Theatre"
+    if (toStage.name === 'In Theatre' && (or_room_id === undefined || or_room_id === null)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'An OR room must be assigned when moving a patient to In Theatre'
+      });
+    }
+
     // Handle OR room assignment if provided
     let orRoomUpdated = false;
     let roomDetails = null;
@@ -101,6 +111,14 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
         });
       }
 
+      if (orRoom.status !== 'Available') {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          error: `Room is not available (current status: ${orRoom.status})`
+        });
+      }
+
       // Update OR room status to Occupied and link to visit
       orRoom.status = 'Occupied';
       orRoom.current_visit_id = visit.id;
@@ -121,7 +139,7 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
 
     const fromStageId = visit.current_stage_id;
 
-    // If leaving "In Theatre" (no room explicitly set), free the current OR room
+    // If leaving "In Theatre", free the current OR room and start a 15-minute cleaning timer
     const fromStage = visit.get('current_stage') as any;
     if (fromStage?.name === 'In Theatre' && toStage.name !== 'In Theatre' && visit.or_room_id) {
       const prevRoom = await ORRoom.findByPk(visit.or_room_id, { transaction });
@@ -130,6 +148,17 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
         prevRoom.current_visit_id = null;
         prevRoom.last_status_change = new Date();
         await prevRoom.save({ transaction });
+
+        const startedAt = new Date();
+        const CLEANING_MINUTES = 15;
+        await CleaningTimer.create({
+          room_id: prevRoom.id,
+          visit_id: visit.id,
+          started_at: startedAt,
+          scheduled_end_at: new Date(startedAt.getTime() + CLEANING_MINUTES * 60_000),
+          duration_minutes: CLEANING_MINUTES,
+          completed: false,
+        }, { transaction });
       }
       visit.or_room_id = null;
     }
