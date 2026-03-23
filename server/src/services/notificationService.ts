@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import twilio from 'twilio';
+import { Resend } from 'resend';
 import { SystemSetting } from '../models/SystemSetting';
 
 interface NotificationPayload {
@@ -13,6 +14,33 @@ interface FamilyContact {
   name: string;
   email?: string | null;
   phone?: string | null;
+}
+
+// ── Resend config ─────────────────────────────────────────────────────────────
+
+interface ResendConfig {
+  apiKey: string;
+  from: string;
+}
+
+async function getResendConfig(): Promise<ResendConfig | null> {
+  try {
+    const rows = await SystemSetting.findAll({
+      where: { key: ['resend_api_key', 'resend_from'] },
+    });
+    const db: Record<string, string> = {};
+    for (const row of rows) {
+      if (row.value) db[row.key] = row.value;
+    }
+    const apiKey = db['resend_api_key'] ?? '';
+    if (!apiKey) return null;
+    return {
+      apiKey,
+      from: db['resend_from'] ?? 'noreply@or-tracking.nhs.uk',
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ── SMTP config ────────────────────────────────────────────────────────────────
@@ -69,25 +97,9 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
 
 // ── Email ─────────────────────────────────────────────────────────────────────
 
-async function sendEmail(to: string, payload: NotificationPayload): Promise<void> {
-  const cfg = await getSmtpConfig();
-  if (!cfg) return;
-
-  const transporter = nodemailer.createTransport({
-    host: cfg.host,
-    port: cfg.port,
-    secure: cfg.secure,
-    auth: { user: cfg.user, pass: cfg.pass },
-  });
-
-  const time = payload.timestamp.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  await transporter.sendMail({
-    from: cfg.from,
-    to,
+function buildEmailContent(payload: NotificationPayload): { subject: string; text: string; html: string } {
+  const time = payload.timestamp.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return {
     subject: `Patient update — ${payload.patientName}`,
     text: [
       `Hello,`,
@@ -125,7 +137,33 @@ async function sendEmail(to: string, payload: NotificationPayload): Promise<void
         </div>
       </div>
     `,
+  };
+}
+
+async function sendEmail(to: string, payload: NotificationPayload): Promise<void> {
+  const { subject, text, html } = buildEmailContent(payload);
+
+  // Try Resend first (uses HTTPS — no port blocking)
+  const resendCfg = await getResendConfig();
+  if (resendCfg) {
+    const client = new Resend(resendCfg.apiKey);
+    const { error } = await client.emails.send({ from: resendCfg.from, to, subject, text, html });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  // Fall back to SMTP
+  const smtpCfg = await getSmtpConfig();
+  if (!smtpCfg) return;
+
+  const transporter = nodemailer.createTransport({
+    host: smtpCfg.host,
+    port: smtpCfg.port,
+    secure: smtpCfg.secure,
+    auth: { user: smtpCfg.user, pass: smtpCfg.pass },
   });
+
+  await transporter.sendMail({ from: smtpCfg.from, to, subject, text, html });
 }
 
 // ── SMS ───────────────────────────────────────────────────────────────────────
@@ -192,9 +230,8 @@ export async function notifyFamilyContacts(
 }
 
 export async function getNotificationConfig(): Promise<{ emailConfigured: boolean; smsConfigured: boolean }> {
+  const resendCfg = await getResendConfig();
+  if (resendCfg) return { emailConfigured: true, smsConfigured };
   const smtpCfg = await getSmtpConfig();
-  return {
-    emailConfigured: smtpCfg !== null,
-    smsConfigured,
-  };
+  return { emailConfigured: smtpCfg !== null, smsConfigured };
 }
