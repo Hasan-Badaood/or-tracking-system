@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { Visit, Patient, Stage, ORRoom, User, FamilyContact } from '../models';
-import { notifyFamilyContacts, notificationConfig } from '../services/notificationService';
+import { notifyFamilyContacts, getNotificationConfig } from '../services/notificationService';
 
 interface AuthRequest extends Request {
   user?: {
@@ -546,7 +546,7 @@ export const notifyFamily = async (req: AuthRequest, res: Response) => {
       success: true,
       sent: { email: result.email, sms: result.sms },
       errors: result.errors,
-      config: notificationConfig,
+      config: await getNotificationConfig(),
     });
   } catch (error) {
     console.error('Notify family error:', error);
