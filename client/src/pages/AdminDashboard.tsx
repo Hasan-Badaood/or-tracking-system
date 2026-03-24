@@ -762,8 +762,13 @@ export const AdminDashboard: React.FC = () => {
                         <CardTitle className="text-sm font-semibold text-gray-700">Patient Pipeline — Right Now</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {activeVisits.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400 text-sm">No active patients</div>
+                        {activeVisits.length === 0 && (todaySummary?.summary.total_visits ?? 0) === 0 ? (
+                          <div className="text-center py-8 text-gray-400 text-sm">No patients registered today</div>
+                        ) : activeVisits.length === 0 ? (
+                          <div className="text-center py-8 text-gray-400 text-sm">
+                            <p className="font-medium text-gray-500">All {todaySummary?.summary.total_visits} patient{(todaySummary?.summary.total_visits ?? 0) !== 1 ? 's' : ''} discharged today</p>
+                            <p className="text-xs mt-1">No patients currently in the system</p>
+                          </div>
                         ) : (
                           <div className="space-y-3">
                             {STAGE_ORDER.filter((s) => stageDistribution[s] > 0).map((stageName) => {
@@ -1090,30 +1095,35 @@ export const AdminDashboard: React.FC = () => {
                         </ResponsiveContainer>
                       </div>
 
-                      {/* Bar — avg time per stage */}
+                      {/* Bar — avg time per stage from stage event history */}
                       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <h3 className="font-semibold text-slate-800 mb-4 text-sm">Avg time per stage (minutes)</h3>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <BarChart data={dailySummary.by_stage} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="stage_name" tick={{ fontSize: 11 }} />
-                            <YAxis tick={{ fontSize: 11 }} />
-                            <Tooltip
-                              formatter={(val: any) => [`${val} min`, 'Avg duration']}
-                              contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
-                            />
-                            <Bar dataKey="average_duration_minutes" radius={[4, 4, 0, 0]}>
-                              {dailySummary.by_stage.map((row) => (
-                                <Cell key={row.stage_name} fill={STAGE_COLORS[row.stage_name] ?? '#94a3b8'} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <h3 className="font-semibold text-slate-800 mb-1 text-sm">Avg time per stage (minutes)</h3>
+                        <p className="text-xs text-slate-400 mb-4">Based on actual stage transition events</p>
+                        {stageDurations.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={220}>
+                            <BarChart data={stageDurations} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="stage_name" tick={{ fontSize: 11 }} />
+                              <YAxis tick={{ fontSize: 11 }} unit=" min" />
+                              <Tooltip
+                                formatter={(val: any) => [`${val} min`, 'Avg time']}
+                                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                              />
+                              <Bar dataKey="average_minutes" radius={[4, 4, 0, 0]}>
+                                {stageDurations.map((row) => (
+                                  <Cell key={row.stage_name} fill={STAGE_COLORS[row.stage_name] ?? '#94a3b8'} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="text-slate-400 text-sm text-center py-10">No stage transition data for this date.</p>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {dailySummary.by_stage.length === 0 && (
+                  {dailySummary.by_stage.length === 0 && stageDurations.length === 0 && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm py-14 text-center">
                       <p className="text-slate-400 text-sm">No visit data for this date.</p>
                     </div>
