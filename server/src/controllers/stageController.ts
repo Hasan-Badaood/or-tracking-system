@@ -106,6 +106,15 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // OR room must NOT be supplied for any other stage
+    if (!isInTheatre && or_room_id !== undefined && or_room_id !== null) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'OR room can only be assigned when moving to In Theatre'
+      });
+    }
+
     // Handle OR room assignment if provided
     let orRoomUpdated = false;
     let roomDetails = null;
