@@ -47,7 +47,7 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
         {
           model: Stage,
           as: 'current_stage',
-          attributes: ['id', 'name', 'color']
+          attributes: ['id', 'name', 'color', 'display_order']
         }
       ],
       transaction
@@ -76,6 +76,23 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'Cannot transition to inactive stage'
+      });
+    }
+
+    // Enforce sequential stage progression — no skipping or going backward
+    const fromStage = visit.get('current_stage') as any;
+    if (!fromStage) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Current stage not found for this visit'
+      });
+    }
+    if (toStage.display_order !== fromStage.display_order + 1) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: `Invalid stage transition: can only advance one step at a time (current: ${fromStage.name}, attempted: ${toStage.name})`
       });
     }
 
@@ -141,7 +158,6 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
     const fromStageId = visit.current_stage_id;
 
     // If leaving "In Theatre", free the current OR room and start a 15-minute cleaning timer
-    const fromStage = visit.get('current_stage') as any;
     const leavingTheatre = fromStage?.name?.trim().toLowerCase() === 'in theatre' && !isInTheatre;
     if (leavingTheatre && visit.or_room_id) {
       const prevRoom = await ORRoom.findByPk(visit.or_room_id, { transaction });
