@@ -14,9 +14,9 @@ export const getDailySummary = async (req: Request, res: Response) => {
     // Get visits created on this date
     const visits = await Visit.findAll({
       where: {
-        created_at: {
+        createdAt: {
           [Op.gte]: startOfDay,
-          [Op.lt]: endOfDay
+          [Op.lte]: endOfDay
         }
       },
       include: [
@@ -31,17 +31,17 @@ export const getDailySummary = async (req: Request, res: Response) => {
     const totalVisits = visits.length;
     const completedVisits = visits.filter(v => {
       const stage = v.get('current_stage') as any;
-      return stage.name === 'Discharged';
+      return stage?.name === 'Discharged';
     }).length;
     const activeVisits = visits.filter(v => {
       const stage = v.get('current_stage') as any;
-      return stage.name !== 'Discharged';
+      return stage?.name !== 'Discharged';
     }).length;
 
     // Calculate average duration
     const durations = visits.map(v => {
-      const created = new Date(v.created_at ?? 0).getTime();
-      const updated = new Date(v.updated_at ?? v.created_at ?? 0).getTime();
+      const created = new Date((v as any).createdAt ?? 0).getTime();
+      const updated = new Date((v as any).updatedAt ?? (v as any).createdAt ?? 0).getTime();
       const diff = Math.floor((updated - created) / 60000);
       return isFinite(diff) ? diff : 0;
     });
@@ -55,11 +55,12 @@ export const getDailySummary = async (req: Request, res: Response) => {
 
     visits.forEach(v => {
       const stage = v.get('current_stage') as any;
+      if (!stage?.name) return;
       if (!stageGroups.has(stage.name)) {
         stageGroups.set(stage.name, []);
       }
-      const created = new Date(v.created_at ?? 0).getTime();
-      const updated = new Date(v.updated_at ?? v.created_at ?? 0).getTime();
+      const created = new Date((v as any).createdAt ?? 0).getTime();
+      const updated = new Date((v as any).updatedAt ?? (v as any).createdAt ?? 0).getTime();
       const duration = Math.floor((updated - created) / 60000);
       if (isFinite(duration)) stageGroups.get(stage.name)!.push(duration);
     });
@@ -115,7 +116,7 @@ export const getDateRange = async (req: Request, res: Response) => {
     end.setHours(23, 59, 59, 999);
 
     const visits = await Visit.findAll({
-      where: { created_at: { [Op.gte]: start, [Op.lte]: end } },
+      where: { createdAt: { [Op.gte]: start, [Op.lte]: end } },
       include: [{ model: Stage, as: 'current_stage', attributes: ['name'] }],
     });
 
@@ -128,7 +129,7 @@ export const getDateRange = async (req: Request, res: Response) => {
     }
 
     visits.forEach((v) => {
-      const ts = v.created_at;
+      const ts = (v as any).createdAt;
       if (!ts) return;
       const d = new Date(ts);
       if (!isFinite(d.getTime())) return;
@@ -165,12 +166,14 @@ export const getStageDuration = async (req: Request, res: Response) => {
     }
 
     const startDate = new Date(start_date as string);
+    startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(end_date as string);
+    endDate.setHours(23, 59, 59, 999);
 
     // Get all stage events in date range
     const stageEvents = await StageEvent.findAll({
       where: {
-        created_at: {
+        createdAt: {
           [Op.gte]: startDate,
           [Op.lte]: endDate
         }
@@ -182,7 +185,7 @@ export const getStageDuration = async (req: Request, res: Response) => {
           attributes: ['name']
         }
       ],
-      order: [['visit_id', 'ASC'], ['created_at', 'ASC']]
+      order: [['visit_id', 'ASC'], ['createdAt', 'ASC']]
     });
 
     // Group by stage and calculate durations
@@ -207,7 +210,7 @@ export const getStageDuration = async (req: Request, res: Response) => {
 
         if (nextEvent) {
           const duration = Math.floor(
-            (new Date(nextEvent.created_at).getTime() - new Date(currentEvent.created_at).getTime()) / 60000
+            (new Date(nextEvent.createdAt).getTime() - new Date(currentEvent.createdAt).getTime()) / 60000
           );
 
           if (!stageDurations.has(stageName)) {
