@@ -50,7 +50,11 @@ export const UpdateStagePage: React.FC = () => {
         if (trackingId) {
           const visitData = await visitsAPI.getByTrackingId(trackingId);
           setVisit(visitData);
-          setSelectedStageId(visitData.current_stage.id);
+
+          // Pre-select the next stage in sequence
+          const currentIdx = stagesData.findIndex((s) => s.id === visitData.current_stage.id);
+          const nextStage = stagesData[currentIdx + 1];
+          setSelectedStageId(nextStage ? nextStage.id : null);
 
           const timelineData = await visitsAPI.getTimeline(visitData.id);
           setTimeline(timelineData);
@@ -108,12 +112,19 @@ export const UpdateStagePage: React.FC = () => {
     ? stages.findIndex((s) => s.id === visit.current_stage.id)
     : -1;
 
+  const nextStageIndex = currentStageIndex + 1;
+
   const getStageStatus = (stage: Stage) => {
     if (!visit) return 'upcoming';
     const idx = stages.findIndex((s) => s.id === stage.id);
     if (idx < currentStageIndex) return 'complete';
     if (stage.id === visit.current_stage.id) return 'current';
     return 'upcoming';
+  };
+
+  const isStageSelectable = (stage: Stage) => {
+    const idx = stages.findIndex((s) => s.id === stage.id);
+    return idx === nextStageIndex;
   };
 
   const availableRooms = rooms.filter((r) => r.status === 'Available');
@@ -209,20 +220,31 @@ export const UpdateStagePage: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {stages.map((stage) => {
                 const status = getStageStatus(stage);
+                const selectable = isStageSelectable(stage);
                 const isSelected = selectedStageId === stage.id;
 
                 return (
                   <button
                     key={stage.id}
-                    onClick={() => setSelectedStageId(stage.id)}
+                    onClick={() => selectable && setSelectedStageId(stage.id)}
+                    disabled={!selectable && status !== 'current'}
+                    title={
+                      status === 'complete'
+                        ? 'Already completed'
+                        : !selectable && status !== 'current'
+                        ? 'Complete the previous stage first'
+                        : undefined
+                    }
                     className={`p-4 rounded-lg border-2 transition-all ${
                       status === 'current'
-                        ? 'border-red-500 bg-red-500 text-white font-semibold'
+                        ? 'border-red-500 bg-red-500 text-white font-semibold cursor-default'
                         : status === 'complete'
-                        ? 'border-green-400 bg-green-50'
-                        : isSelected
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 bg-white hover:border-gray-400'
+                        ? 'border-green-400 bg-green-50 opacity-60 cursor-not-allowed'
+                        : selectable && isSelected
+                        ? 'border-blue-500 bg-blue-50 cursor-pointer'
+                        : selectable
+                        ? 'border-gray-300 bg-white hover:border-blue-400 cursor-pointer'
+                        : 'border-gray-200 bg-gray-50 opacity-40 cursor-not-allowed'
                     }`}
                   >
                     <div
@@ -231,9 +253,11 @@ export const UpdateStagePage: React.FC = () => {
                           ? 'text-white'
                           : status === 'complete'
                           ? 'text-green-600'
-                          : isSelected
+                          : selectable && isSelected
                           ? 'text-blue-600'
-                          : 'text-gray-600'
+                          : selectable
+                          ? 'text-gray-600'
+                          : 'text-gray-400'
                       }`}
                     >
                       {stage.name}
@@ -246,6 +270,9 @@ export const UpdateStagePage: React.FC = () => {
                     )}
                     {status === 'current' && (
                       <div className="text-xs mt-1 text-white">CURRENT</div>
+                    )}
+                    {selectable && (
+                      <div className="text-xs mt-1 text-blue-500">NEXT</div>
                     )}
                   </button>
                 );
