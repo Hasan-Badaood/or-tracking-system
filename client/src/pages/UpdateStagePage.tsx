@@ -226,7 +226,13 @@ export const UpdateStagePage: React.FC = () => {
                 return (
                   <button
                     key={stage.id}
-                    onClick={() => selectable && setSelectedStageId(stage.id)}
+                    onClick={() => {
+                      if (!selectable) return;
+                      setSelectedStageId(stage.id);
+                      // Clear room selection if the new stage does not require one
+                      const stageName = stage.name.trim().toLowerCase();
+                      if (stageName !== 'in theatre') setSelectedRoomId('');
+                    }}
                     disabled={!selectable && status !== 'current'}
                     title={
                       status === 'complete'
