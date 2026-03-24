@@ -1,6 +1,7 @@
 import { Op } from 'sequelize';
 import { CleaningTimer } from '../models/CleaningTimer';
 import { ORRoom } from '../models/ORRoom';
+import { Visit } from '../models/Visit';
 
 const POLL_INTERVAL_MS = 60_000; // check every minute
 const CLEANING_MINUTES = 15;
@@ -54,6 +55,46 @@ async function autoCompleteExpiredTimers(): Promise<void> {
       await room.save();
       completed++;
       console.log(`[cleaning] Room "${room.name}" recovered from stuck Cleaning state`);
+    }
+
+    // 3. Recover rooms stuck in Occupied with no active patient
+    //    (e.g. visit discharged without going through proper stage, data inconsistency)
+    const occupiedRooms = await ORRoom.findAll({
+      where: { status: 'Occupied' },
+    });
+
+    for (const room of occupiedRooms) {
+      let isOrphaned = false;
+
+      if (room.current_visit_id === null) {
+        isOrphaned = true;
+      } else {
+        const visit = await Visit.findByPk(room.current_visit_id);
+        if (!visit || !visit.active) isOrphaned = true;
+      }
+
+      if (!isOrphaned) continue;
+
+      // Move to Cleaning so the room goes through the standard cleaning cycle
+      room.status = 'Cleaning';
+      room.current_visit_id = null;
+      room.last_status_change = new Date();
+      await room.save();
+
+      // Destroy any stale incomplete timers for this room then create a fresh one
+      await CleaningTimer.destroy({ where: { room_id: room.id, completed: false } });
+      const startedAt = new Date();
+      await CleaningTimer.create({
+        room_id: room.id,
+        visit_id: null,
+        started_at: startedAt,
+        scheduled_end_at: new Date(startedAt.getTime() + CLEANING_MINUTES * 60_000),
+        duration_minutes: CLEANING_MINUTES,
+        completed: false,
+      });
+
+      completed++;
+      console.log(`[cleaning] Room "${room.name}" recovered from orphaned Occupied state — cleaning started`);
     }
 
     if (completed > 0) {
