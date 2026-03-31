@@ -379,8 +379,9 @@ export const FamilyPortal: React.FC = () => {
                   <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-200" />
                   <div className="space-y-0">
                     {STAGE_ORDER.map((stageName, idx) => {
-                      const isCompleted = idx < currentStageIdx;
-                      const isCurrent = idx === currentStageIdx;
+                      const isDischarged = visitStatus?.current_stage.name === 'Discharged';
+                      const isCompleted = isDischarged ? idx <= currentStageIdx : idx < currentStageIdx;
+                      const isCurrent = !isDischarged && idx === currentStageIdx;
                       const isPending = idx > currentStageIdx;
 
                       return (
