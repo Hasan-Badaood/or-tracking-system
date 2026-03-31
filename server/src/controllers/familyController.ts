@@ -37,13 +37,48 @@ export const requestOTP = async (req: Request, res: Response) => {
 
     // Find the visit
     const visit = await Visit.findOne({
-      where: { visit_tracking_id, active: true }
+      where: { visit_tracking_id },
+      include: [
+        {
+          model: Stage,
+          as: 'current_stage',
+          attributes: ['name', 'color']
+        },
+        {
+          model: Patient,
+          as: 'patient',
+          attributes: ['first_name']
+        }
+      ]
     });
 
     if (!visit) {
       return res.status(404).json({
         success: false,
-        error: 'Visit not found or no longer active'
+        error: 'Visit not found'
+      });
+    }
+
+    // If already discharged, no OTP needed — return status directly
+    const currentStage = visit.get('current_stage') as any;
+    const patient = visit.get('patient') as any;
+    if (!visit.active || currentStage?.name === 'Discharged') {
+      const currentIndex = STAGE_ORDER.indexOf(currentStage?.name ?? 'Discharged');
+      return res.json({
+        success: true,
+        discharged: true,
+        visit: {
+          visit_tracking_id: visit.visit_tracking_id,
+          patient_first_name: patient?.first_name ?? '',
+          current_stage: {
+            name: currentStage?.name ?? 'Discharged',
+            color: currentStage?.color ?? '#95a5a6'
+          },
+          stage_progress_percent: currentIndex >= 0
+            ? Math.round(((currentIndex + 1) / STAGE_ORDER.length) * 100)
+            : 100,
+          updated_at: visit.updated_at
+        }
       });
     }
 

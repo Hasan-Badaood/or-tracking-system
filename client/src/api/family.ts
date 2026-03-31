@@ -21,7 +21,7 @@ export const familyAPI = {
     visit_tracking_id: string;
     email?: string;
     phone?: string;
-  }): Promise<{ message: string }> => {
+  }): Promise<{ message?: string; discharged?: boolean; visit?: FamilyVisitStatus }> => {
     const response = await apiClient.post('/family/request-otp', data);
     return response.data;
   },
