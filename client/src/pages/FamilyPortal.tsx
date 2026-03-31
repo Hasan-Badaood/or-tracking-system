@@ -63,11 +63,17 @@ export const FamilyPortal: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      await familyAPI.requestOtp({
+      const result = await familyAPI.requestOtp({
         visit_tracking_id: visitTrackingId,
         ...(email && { email }),
       });
-      setStep('otp');
+      if (result.discharged && result.visit) {
+        setVisitStatus(result.visit);
+        setLastRefreshed(new Date());
+        setStep('status');
+      } else {
+        setStep('otp');
+      }
     } catch (err: any) {
       const msg: string = err.response?.data?.error ?? '';
       if (msg.includes('No family contact')) {
@@ -440,7 +446,9 @@ export const FamilyPortal: React.FC = () => {
                     ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                     : 'Live'}
                 </span>
-                <span>Auto-refreshes every 60 s</span>
+                {visitStatus?.current_stage.name !== 'Discharged' && (
+                  <span>Auto-refreshes every 60 s</span>
+                )}
               </div>
             </div>
           </div>
