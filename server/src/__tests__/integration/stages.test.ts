@@ -15,6 +15,9 @@ jest.mock('../../models', () => ({
 jest.mock('../../models/CleaningTimer', () => ({
   CleaningTimer: { create: jest.fn() },
 }));
+jest.mock('../../models/SystemSetting', () => ({
+  SystemSetting: { findAll: jest.fn().mockResolvedValue([]), upsert: jest.fn() },
+}));
 jest.mock('../../services/notificationService', () => ({
   notifyFamilyContacts: jest.fn().mockResolvedValue(undefined),
 }));
