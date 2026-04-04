@@ -1,3 +1,21 @@
+jest.mock('../../models', () => ({
+  Visit: { findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn(), findAndCountAll: jest.fn() },
+  Stage: { findByPk: jest.fn(), findOne: jest.fn() },
+  Patient: { findOne: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+  StageEvent: { create: jest.fn() },
+  ORRoom: { findByPk: jest.fn() },
+  FamilyContact: { create: jest.fn() },
+  User: { findByPk: jest.fn() },
+}));
+jest.mock('../../models/SystemSetting', () => ({
+  SystemSetting: { findAll: jest.fn().mockResolvedValue([]), upsert: jest.fn() },
+}));
+jest.mock('../../models/CleaningTimer', () => ({
+  CleaningTimer: { create: jest.fn() },
+}));
+jest.mock('../../services/notificationService', () => ({
+  notifyFamilyContacts: jest.fn(),
+}));
 jest.mock('../../models/User', () => ({
   User: { findOne: jest.fn(), findByPk: jest.fn() },
 }));
