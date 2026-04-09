@@ -84,7 +84,7 @@ export const otpRequestRateLimit = rateLimit({
 
 export const otpVerifyRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3,
+  max: 100,
   message: 'Too many verification attempts. Please try again later.',
   keyGenerator: (req) => req.body.phone || req.ip || 'unknown'
 });
