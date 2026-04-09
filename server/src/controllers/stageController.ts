@@ -21,7 +21,7 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { to_stage_id, or_room_id, notes } = req.body;
+    const { to_stage_id, or_room_id, notes, discharge_note } = req.body;
 
     // Authentication check
     if (!req.user) {
@@ -202,9 +202,20 @@ export const updateVisitStage = async (req: AuthRequest, res: Response) => {
     // Update visit current_stage_id
     visit.current_stage_id = to_stage_id;
 
+    // Discharge note is required when moving to Discharged
+    const isDischarged = toStage.name === 'Discharged';
+    if (isDischarged && !discharge_note?.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'A discharge note is required when discharging a patient (e.g. "Discharged to home")'
+      });
+    }
+
     // Auto-deactivate when discharged
-    if (toStage.name === 'Discharged') {
+    if (isDischarged) {
       visit.active = false;
+      visit.discharge_note = discharge_note.trim();
     }
 
     await visit.save({ transaction });

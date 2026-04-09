@@ -38,6 +38,7 @@ export const requestOTP = async (req: Request, res: Response) => {
     // Find the visit
     const visit = await Visit.findOne({
       where: { visit_tracking_id },
+      attributes: { include: ['discharge_note'] },
       include: [
         {
           model: Stage,
@@ -77,6 +78,7 @@ export const requestOTP = async (req: Request, res: Response) => {
           stage_progress_percent: currentIndex >= 0
             ? Math.round(((currentIndex + 1) / STAGE_ORDER.length) * 100)
             : 100,
+          discharge_note: visit.discharge_note ?? null,
           updated_at: visit.updated_at
         }
       });
@@ -184,6 +186,7 @@ export const verifyOTP = async (req: Request, res: Response) => {
     // Find the visit
     const visit = await Visit.findOne({
       where: { visit_tracking_id },
+      attributes: { include: ['discharge_note'] },
       include: [
         {
           model: Patient,
@@ -288,6 +291,7 @@ export const verifyOTP = async (req: Request, res: Response) => {
           color: currentStage.color
         },
         stage_progress_percent: stageProgressPercent,
+        discharge_note: visit.discharge_note ?? null,
         updated_at: visit.updated_at
       }
     });
@@ -311,6 +315,7 @@ export const getVisitStatus = async (req: Request, res: Response) => {
         {
           model: Visit,
           as: 'visit',
+          attributes: { include: ['discharge_note'] },
           include: [
             {
               model: Patient,
@@ -358,6 +363,7 @@ export const getVisitStatus = async (req: Request, res: Response) => {
         color: currentStage.color
       },
       stage_progress_percent: stageProgressPercent,
+      discharge_note: visit.discharge_note ?? null,
       updated_at: visit.updated_at
     });
   } catch (error) {

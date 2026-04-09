@@ -8,6 +8,7 @@ export interface FamilyVisitStatus {
   };
   stage_progress_percent: number;
   visit_tracking_id: string;
+  discharge_note: string | null;
   updated_at: string;
 }
 
@@ -45,6 +46,7 @@ export const familyAPI = {
       current_stage: d.current_stage,
       stage_progress_percent: d.stage_progress_percent,
       visit_tracking_id: d.visit_tracking_id,
+      discharge_note: d.discharge_note ?? null,
       updated_at: d.updated_at,
     };
   },
