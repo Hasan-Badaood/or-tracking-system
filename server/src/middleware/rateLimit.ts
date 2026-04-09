@@ -77,7 +77,7 @@ export const loginRateLimit = rateLimit({
 
 export const otpRequestRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3,
+  max: 100,
   message: 'Too many OTP requests. Please try again later.',
   keyGenerator: (req) => req.body.phone || req.ip || 'unknown'
 });
