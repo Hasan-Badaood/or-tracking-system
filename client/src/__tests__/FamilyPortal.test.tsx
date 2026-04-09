@@ -16,6 +16,8 @@ vi.mock('lucide-react', () => ({
   Loader2: () => <span data-testid="loader" />,
   Eye: () => <span />,
   EyeOff: () => <span />,
+  RefreshCw: () => <span />,
+  X: () => <span />,
 }));
 
 const sampleVisit = {
