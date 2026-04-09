@@ -9,6 +9,7 @@ export class Visit extends Model {
   public or_room_id!: number | null;
   public created_by!: number;
   public notes!: string | null;
+  public discharge_note!: string | null;
   public scheduled_time!: Date | null;
   public barcode_data!: string;
   public active!: boolean;
@@ -44,6 +45,10 @@ Visit.init({
     allowNull: false
   },
   notes: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  discharge_note: {
     type: DataTypes.TEXT,
     allowNull: true
   },
