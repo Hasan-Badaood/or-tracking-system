@@ -10,11 +10,13 @@ import reportRoutes from './routes/reports';
 import barcodeRoutes from './routes/barcode';
 import settingsRoutes from './routes/settings';
 import { generalApiRateLimit } from './middleware/rateLimit';
+import { encryptResponse } from './middleware/encrypt';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(encryptResponse);
 
 // Skip rate limiting in test environment to avoid interference with test assertions
 if (process.env.NODE_ENV !== 'test') {
