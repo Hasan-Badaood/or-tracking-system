@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import twilio from 'twilio';
 import { authenticate } from '../middleware/auth';
 import { SystemSetting } from '../models/SystemSetting';
 
@@ -196,6 +197,97 @@ router.post('/resend/send-test', authenticate, async (req: Request, res: Respons
       html: '<div style="font-family:sans-serif;padding:24px"><p>This is a test email from your <strong>OR Patient Tracking System</strong>.</p><p>Email notifications are working correctly.</p></div>',
     });
     if (error) throw new Error((error as any).message ?? JSON.stringify(error));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/settings/twilio
+router.get('/twilio', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const rows = await SystemSetting.findAll({ where: { key: ['twilio_account_sid', 'twilio_auth_token', 'twilio_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) { if (row.value !== null) db[row.key] = row.value; }
+
+  res.json({
+    success: true,
+    config: {
+      twilio_account_sid: db['twilio_account_sid'] ?? '',
+      twilio_auth_token:  db['twilio_auth_token']  ? PASS_PLACEHOLDER : '',
+      twilio_from:        db['twilio_from']        ?? '',
+    },
+  });
+});
+
+// PUT /api/settings/twilio
+router.put('/twilio', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { twilio_account_sid, twilio_auth_token, twilio_from } = req.body;
+
+  if (twilio_account_sid !== undefined)
+    await SystemSetting.upsert({ key: 'twilio_account_sid', value: String(twilio_account_sid).trim() });
+  if (twilio_from !== undefined)
+    await SystemSetting.upsert({ key: 'twilio_from', value: String(twilio_from).trim() });
+  if (twilio_auth_token !== undefined && twilio_auth_token !== PASS_PLACEHOLDER && twilio_auth_token !== '')
+    await SystemSetting.upsert({ key: 'twilio_auth_token', value: String(twilio_auth_token).trim() });
+
+  res.json({ success: true });
+});
+
+// POST /api/settings/twilio/test — validate credentials by listing Twilio account
+router.post('/twilio/test', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const rows = await SystemSetting.findAll({ where: { key: ['twilio_account_sid', 'twilio_auth_token', 'twilio_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) { if (row.value) db[row.key] = row.value; }
+
+  const sid   = db['twilio_account_sid'] ?? process.env.TWILIO_ACCOUNT_SID ?? '';
+  const token = db['twilio_auth_token']  ?? process.env.TWILIO_AUTH_TOKEN  ?? '';
+  const from  = db['twilio_from']        ?? process.env.TWILIO_FROM        ?? '';
+
+  if (!sid || !token || !from) {
+    return res.status(400).json({ success: false, error: 'Twilio config is incomplete (SID, auth token, and from number required)' });
+  }
+
+  try {
+    const client = twilio(sid, token);
+    await client.api.accounts(sid).fetch();
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/settings/twilio/send-test — send a test SMS to a given number
+router.post('/twilio/send-test', authenticate, async (req: Request, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { to } = req.body;
+  if (!to) return res.status(400).json({ success: false, error: 'to phone number is required' });
+
+  const rows = await SystemSetting.findAll({ where: { key: ['twilio_account_sid', 'twilio_auth_token', 'twilio_from'] } });
+  const db: Record<string, string> = {};
+  for (const row of rows) { if (row.value) db[row.key] = row.value; }
+
+  const sid   = db['twilio_account_sid'] ?? process.env.TWILIO_ACCOUNT_SID ?? '';
+  const token = db['twilio_auth_token']  ?? process.env.TWILIO_AUTH_TOKEN  ?? '';
+  const from  = db['twilio_from']        ?? process.env.TWILIO_FROM        ?? '';
+
+  if (!sid || !token || !from) {
+    return res.status(400).json({ success: false, error: 'Twilio config is incomplete' });
+  }
+
+  try {
+    const client = twilio(sid, token);
+    await client.messages.create({
+      from,
+      to,
+      body: 'This is a test message from your OR Patient Tracking System. SMS notifications are working correctly.',
+    });
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
