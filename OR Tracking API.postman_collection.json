@@ -2300,6 +2300,123 @@
           "response": []
         },
         {
+          "name": "Get Twilio Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns config', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.config).to.have.property('twilio_account_sid');",
+                  "  pm.expect(json.config).to.have.property('twilio_from');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/settings/twilio",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "twilio"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Twilio Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"twilio_account_sid\": \"ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  \"twilio_auth_token\": \"your_auth_token\",\n  \"twilio_from\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings/twilio",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "twilio"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Twilio Credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 400', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/settings/twilio/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "twilio", "test"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Twilio Test SMS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 400', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"+447700900001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings/twilio/send-test",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "twilio", "send-test"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Send Resend Test Email",
           "event": [
             {
@@ -2340,6 +2457,41 @@
                 "resend",
                 "send-test"
               ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns OK', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.equal('OK');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["health"]
             }
           },
           "response": []

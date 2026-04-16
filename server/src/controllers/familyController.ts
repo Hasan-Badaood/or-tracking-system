@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import crypto from 'crypto';
 import { Visit, FamilyContact, FamilyToken, Patient, Stage } from '../models';
-import { sendOTPEmail } from '../lib/mailer';
+import { sendOTPEmail, sendOTPSms } from '../lib/mailer';
 
 // Helper to generate 6-digit OTP
 const generateOTP = (): string => {
@@ -145,10 +145,9 @@ export const requestOTP = async (req: Request, res: Response) => {
 
     const recipientEmail = familyContact.email;
     if (recipientEmail) {
-      await sendOTPEmail(recipientEmail, otp, 'your relative');
+      await sendOTPEmail(recipientEmail, otp, familyContact.name);
     } else {
-      // SMS not yet integrated
-      console.log(`[DEV] OTP SMS to ${familyContact.phone}: ${otp}`);
+      await sendOTPSms(familyContact.phone, otp, familyContact.name);
     }
 
     const maskedRecipient = recipientEmail
