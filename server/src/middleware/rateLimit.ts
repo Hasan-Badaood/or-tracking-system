@@ -35,6 +35,8 @@ export const rateLimit = (options: {
 
   return (req: Request, res: Response, next: NextFunction) => {
     if (process.env.NODE_ENV === 'test') return next();
+    const ip = req.ip ?? '';
+    if (process.env.NODE_ENV !== 'production' && (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1')) return next();
 
     const key = keyGenerator(req);
     const now = Date.now();

@@ -24,8 +24,16 @@ apiClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    if (encryptionEnabled && isEncryptedPayload(error.response?.data)) {
+      try {
+        error.response.data = await decryptPayload(error.response.data);
+      } catch {
+        // ignore decryption failure on error responses
+      }
+    }
+    const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+    if (error.response?.status === 401 && !isLoginEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
