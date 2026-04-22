@@ -9,6 +9,7 @@ jest.mock('../../models', () => ({
   ORRoom: { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() },
   FamilyContact: { create: jest.fn() },
   User: { findByPk: jest.fn() },
+  CleaningTimer: { create: jest.fn(), findOne: jest.fn(), destroy: jest.fn() },
 }));
 jest.mock('../../models/CleaningTimer', () => ({
   CleaningTimer: { create: jest.fn(), findOne: jest.fn(), destroy: jest.fn() },
@@ -32,8 +33,7 @@ jest.mock('../../models/User', () => ({
 
 import request from 'supertest';
 import app from '../../app';
-import { ORRoom } from '../../models';
-import { CleaningTimer } from '../../models/CleaningTimer';
+import { ORRoom, CleaningTimer } from '../../models';
 import jwt from 'jsonwebtoken';
 
 const makeToken = (role = 'admin') =>
