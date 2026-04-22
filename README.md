@@ -124,6 +124,79 @@ pnpm run build    # production build
 pnpm run preview  # preview build
 ```
 
+## Running the Tests
+
+### Unit and Integration Tests
+
+The project has 214 automated tests (163 backend, 51 frontend).
+
+**Run all tests (both backend and frontend):**
+```bash
+pnpm test
+```
+
+**Backend only (Jest, from the server directory):**
+```bash
+cd server
+pnpm test
+```
+
+**Backend with coverage report:**
+```bash
+cd server
+pnpm test --coverage
+```
+
+**Frontend only (Vitest, from the client directory):**
+```bash
+cd client
+pnpm test --run
+```
+
+**Frontend with coverage report:**
+```bash
+cd client
+pnpm test --run --coverage
+```
+
+No database or running server is needed — all external dependencies are mocked.
+
+---
+
+### End-to-End Tests (Playwright)
+
+E2E tests run against the live app, so both servers must be running first.
+
+**Step 1 — start the app in one terminal:**
+```bash
+pnpm dev
+```
+Wait until you see both the server (port 3000) and client (port 5173) ready messages.
+
+**Step 2 — run e2e tests in a second terminal:**
+```bash
+pnpm test:e2e
+```
+
+**Watch the browser as tests run:**
+```bash
+pnpm test:e2e --headed
+```
+
+**Open the Playwright interactive UI:**
+```bash
+pnpm test:e2e --ui
+```
+
+**Run a single test file:**
+```bash
+pnpm test:e2e e2e/tests/auth.spec.ts
+```
+
+The e2e tests require the default seed users to exist in the database. If the database has been reset, run `pnpm seed` in the server directory before running e2e tests.
+
+---
+
 ## Testing the API (Postman)
 
 Import `OR Tracking API.postman_collection.json` into Postman. The collection covers all 9 route groups with 30 requests.

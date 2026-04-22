@@ -70,15 +70,15 @@ describe('CreateVisitForm', () => {
     await user.type(screen.getByLabelText(/MRN/i), 'MRN001');
     await user.type(screen.getByLabelText(/First Name/i), 'John');
     await user.type(screen.getByLabelText(/Last Name/i), 'Doe');
-    await user.type(screen.getByLabelText(/Contact Name/i), 'Jane Doe');
-    // intentionally leave fcPhone empty
+
+    await user.click(screen.getByRole('button', { name: /\+ Add contact/i }));
+    await user.type(screen.getByLabelText(/^Name \*/i), 'Jane Doe');
+    // intentionally leave phone empty
 
     await user.click(screen.getByRole('button', { name: /Register Visit/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Family contact requires name, phone, and relationship')
-      ).toBeInTheDocument();
+      expect(screen.getByText(/name, phone, and relationship are required/i)).toBeInTheDocument();
     });
   });
 
@@ -91,18 +91,16 @@ describe('CreateVisitForm', () => {
     await user.type(screen.getByLabelText(/First Name/i), 'John');
     await user.type(screen.getByLabelText(/Last Name/i), 'Doe');
 
-    // Fill name and phone to trigger hasFamilyContact = true
-    await user.type(screen.getByLabelText(/Contact Name/i), 'Jane Doe');
-    await user.type(screen.getByLabelText(/Phone/i), '+447700000000');
-    await user.type(screen.getByLabelText(/Relationship/i), 'Spouse');
+    await user.click(screen.getByRole('button', { name: /\+ Add contact/i }));
+    await user.type(screen.getByLabelText(/^Name \*/i), 'Jane Doe');
+    await user.type(screen.getByLabelText(/^Phone \*/i), '+447700000000');
+    await user.type(screen.getByLabelText(/Relationship \*/i), 'Spouse');
+    // consent checkbox visible but NOT checked
 
-    // Consent checkbox should now be visible — do NOT check it
     await user.click(screen.getByRole('button', { name: /Register Visit/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Family contact consent must be given')
-      ).toBeInTheDocument();
+      expect(screen.getByText(/patient consent must be given/i)).toBeInTheDocument();
     });
   });
 
