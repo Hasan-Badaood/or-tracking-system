@@ -77,13 +77,8 @@ const makeRoom = (id: number, status: string) => ({
 describe('NurseDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
     vi.mocked(visitsAPI.getAll).mockResolvedValue({ visits: [], total: 0, pagination: {} } as any);
     vi.mocked(roomsAPI.getAll).mockResolvedValue([]);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('shows loading state initially', () => {
