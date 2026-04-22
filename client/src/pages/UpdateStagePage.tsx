@@ -210,6 +210,9 @@ export const UpdateStagePage: React.FC = () => {
                 <span>Current Stage: {visit.current_stage.name}</span>
                 {visit.or_room && <span>OR Room: {visit.or_room.name}</span>}
               </div>
+              {visit.notes && (
+                <p className="text-sm text-gray-500 italic mt-1">"{visit.notes}"</p>
+              )}
               <div>
                 <Badge
                   className="text-white font-semibold px-4 py-1"

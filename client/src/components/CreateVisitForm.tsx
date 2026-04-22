@@ -4,46 +4,53 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { visitsAPI } from '@/api/visits';
+import { visitsAPI, FamilyContactInput } from '@/api/visits';
 
 interface CreateVisitFormProps {
   onSuccess: () => void;
   onCancel?: () => void;
 }
 
-export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
-  onSuccess,
-  onCancel
-}) => {
+const emptyContact = (): FamilyContactInput => ({
+  name: '',
+  relationship: '',
+  phone: '',
+  email: '',
+  consent_given: false,
+});
+
+export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({ onSuccess, onCancel }) => {
   const [mrn, setMrn] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
 
-  // Family contact (optional)
-  const [fcName, setFcName] = useState('');
-  const [fcRelationship, setFcRelationship] = useState('');
-  const [fcPhone, setFcPhone] = useState('');
-  const [fcEmail, setFcEmail] = useState('');
-  const [fcConsent, setFcConsent] = useState(false);
+  const [contacts, setContacts] = useState<FamilyContactInput[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const hasFamilyContact = fcName.trim() !== '' || fcPhone.trim() !== '';
+  const updateContact = (index: number, field: keyof FamilyContactInput, value: string | boolean) => {
+    setContacts((prev) => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
+  };
+
+  const addContact = () => setContacts((prev) => [...prev, emptyContact()]);
+
+  const removeContact = (index: number) => setContacts((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (hasFamilyContact) {
-      if (!fcName.trim() || !fcPhone.trim() || !fcRelationship.trim()) {
-        setError('Family contact requires name, phone, and relationship');
+    for (let i = 0; i < contacts.length; i++) {
+      const fc = contacts[i];
+      if (!fc.name.trim() || !fc.phone.trim() || !fc.relationship.trim()) {
+        setError(`Contact ${i + 1}: name, phone, and relationship are required`);
         return;
       }
-      if (!fcConsent) {
-        setError('Family contact consent must be given');
+      if (!fc.consent_given) {
+        setError(`Contact ${i + 1}: patient consent must be given`);
         return;
       }
     }
@@ -51,7 +58,7 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
     setLoading(true);
 
     try {
-      await visitsAPI.create({
+      const payload: Parameters<typeof visitsAPI.create>[0] = {
         patient: {
           mrn,
           first_name: firstName,
@@ -59,19 +66,21 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
           ...(dob && { date_of_birth: dob }),
           ...(gender && { gender }),
         },
-        ...(hasFamilyContact && {
-          family_contact: {
-            name: fcName.trim(),
-            relationship: fcRelationship.trim(),
-            phone: fcPhone.trim(),
-            ...(fcEmail.trim() && { email: fcEmail.trim() }),
-            consent_given: fcConsent,
-          },
+        ...(contacts.length > 0 && {
+          family_contacts: contacts.map((fc) => ({
+            name: fc.name.trim(),
+            relationship: fc.relationship.trim(),
+            phone: fc.phone.trim(),
+            ...(fc.email?.trim() && { email: fc.email.trim() }),
+            consent_given: fc.consent_given,
+          })),
         }),
-      });
+      };
+
+      await visitsAPI.create(payload);
 
       setMrn(''); setFirstName(''); setLastName(''); setDob(''); setGender('');
-      setFcName(''); setFcRelationship(''); setFcPhone(''); setFcEmail(''); setFcConsent(false);
+      setContacts([]);
       onSuccess();
     } catch (err: any) {
       const msg: string = err.response?.data?.error || '';
@@ -105,12 +114,7 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="dob">Date of Birth</Label>
-              <Input
-                id="dob"
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-              />
+              <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
             </div>
           </div>
 
@@ -151,69 +155,103 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
             </Select>
           </div>
 
+          {/* Family contacts */}
           <div className="border-t pt-4 space-y-3">
-            <p className="text-sm font-medium text-gray-700">
-              Family Contact <span className="text-gray-400 font-normal">(optional)</span>
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fcName">Contact Name</Label>
-                <Input
-                  id="fcName"
-                  value={fcName}
-                  onChange={(e) => setFcName(e.target.value)}
-                  placeholder="Full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fcRelationship">Relationship</Label>
-                <Input
-                  id="fcRelationship"
-                  value={fcRelationship}
-                  onChange={(e) => setFcRelationship(e.target.value)}
-                  placeholder="e.g. Spouse, Parent"
-                />
-              </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-700">
+                Family Contacts <span className="text-gray-400 font-normal">(optional)</span>
+              </p>
+              <button
+                type="button"
+                onClick={addContact}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium border border-blue-200 rounded-md px-2.5 py-1 hover:bg-blue-50 transition-colors"
+              >
+                + Add contact
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fcPhone">Phone</Label>
-                <Input
-                  id="fcPhone"
-                  type="tel"
-                  value={fcPhone}
-                  onChange={(e) => setFcPhone(e.target.value)}
-                  placeholder="+44 7700 000000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fcEmail">Email (for OTP)</Label>
-                <Input
-                  id="fcEmail"
-                  type="email"
-                  value={fcEmail}
-                  onChange={(e) => setFcEmail(e.target.value)}
-                  placeholder="contact@email.com"
-                />
-              </div>
-            </div>
-            {hasFamilyContact && (
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={fcConsent}
-                  onChange={(e) => setFcConsent(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Patient consents to family members tracking their progress
-              </label>
+
+            {contacts.length === 0 && (
+              <p className="text-xs text-gray-400 italic">
+                No contacts added. Click "Add contact" to add a family member who can track the patient's progress.
+              </p>
             )}
+
+            {contacts.map((fc, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    Contact {i + 1}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => removeContact(i)}
+                    className="text-xs text-red-500 hover:text-red-600 font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`fc-name-${i}`}>Name *</Label>
+                    <Input
+                      id={`fc-name-${i}`}
+                      value={fc.name}
+                      onChange={(e) => updateContact(i, 'name', e.target.value)}
+                      placeholder="Full name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`fc-rel-${i}`}>Relationship *</Label>
+                    <Input
+                      id={`fc-rel-${i}`}
+                      value={fc.relationship}
+                      onChange={(e) => updateContact(i, 'relationship', e.target.value)}
+                      placeholder="e.g. Spouse, Parent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`fc-phone-${i}`}>Phone * <span className="text-gray-400 font-normal">(for SMS)</span></Label>
+                    <Input
+                      id={`fc-phone-${i}`}
+                      type="tel"
+                      value={fc.phone}
+                      onChange={(e) => updateContact(i, 'phone', e.target.value)}
+                      placeholder="+44 7700 000000"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`fc-email-${i}`}>Email <span className="text-gray-400 font-normal">(for OTP)</span></Label>
+                    <Input
+                      id={`fc-email-${i}`}
+                      type="email"
+                      value={fc.email}
+                      onChange={(e) => updateContact(i, 'email', e.target.value)}
+                      placeholder="contact@email.com"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-2.5 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={fc.consent_given}
+                    onChange={(e) => updateContact(i, 'consent_given', e.target.checked)}
+                    className="h-4 w-4 mt-0.5 shrink-0"
+                  />
+                  <span className="text-gray-700">
+                    Patient consents to this contact tracking their surgical progress
+                  </span>
+                </label>
+              </div>
+            ))}
           </div>
 
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
-              {error}
-            </div>
+            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">{error}</div>
           )}
 
           <div className="flex gap-2">
@@ -221,11 +259,7 @@ export const CreateVisitForm: React.FC<CreateVisitFormProps> = ({
               {loading ? 'Registering...' : 'Register Visit'}
             </Button>
             {onCancel && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-              >
+              <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
             )}

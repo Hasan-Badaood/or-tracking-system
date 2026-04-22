@@ -180,12 +180,17 @@ export const ReceptionDashboard: React.FC = () => {
                       </td>
 
                       {/* Family contact indicator */}
-                      <td className="hidden md:table-cell px-5 py-3.5 text-center">
+                      <td className="hidden md:table-cell px-5 py-3.5">
                         {visit.family_contacts && visit.family_contacts.length > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Yes
-                          </span>
+                          <div className="space-y-1">
+                            {visit.family_contacts.map((fc) => (
+                              <div key={fc.id} className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="text-xs text-slate-700 font-medium truncate max-w-[120px]">{fc.name}</span>
+                                <span className="text-xs text-slate-400">· {fc.relationship}</span>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}

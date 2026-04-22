@@ -53,6 +53,14 @@ export interface TimelineEvent {
   duration_minutes?: number;
 }
 
+export interface FamilyContactInput {
+  name: string;
+  relationship: string;
+  phone: string;
+  email?: string;
+  consent_given: boolean;
+}
+
 export interface CreateVisitData {
   patient: {
     mrn: string;
@@ -61,13 +69,7 @@ export interface CreateVisitData {
     date_of_birth?: string;
     gender?: string;
   };
-  family_contact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-    email?: string;
-    consent_given: boolean;
-  };
+  family_contacts?: FamilyContactInput[];
 }
 
 export interface VisitsListParams {

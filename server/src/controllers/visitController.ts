@@ -122,6 +122,12 @@ export const getVisits = async (req: Request, res: Response) => {
           model: User,
           as: 'created_by_user',
           attributes: ['id', 'username', 'name', 'role']
+        },
+        {
+          model: FamilyContact,
+          as: 'family_contacts',
+          attributes: ['id', 'name', 'relationship', 'phone', 'email', 'consent_given'],
+          required: false,
         }
       ],
       order: [['created_at', 'DESC']],
@@ -157,11 +163,19 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
     const {
       patient,
       family_contact,
+      family_contacts,
       current_stage_id,
       or_room_id,
       notes,
       scheduled_time
     } = req.body;
+
+    // Normalise: accept both singular and array forms
+    const contacts: typeof family_contacts = family_contacts?.length
+      ? family_contacts
+      : family_contact
+      ? [family_contact]
+      : [];
 
     if (!req.user) {
       return res.status(401).json({
@@ -197,13 +211,13 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Validate family contact if provided
-    if (family_contact) {
-      const { name, phone, relationship, consent_given } = family_contact;
+    // Validate each family contact
+    for (const fc of contacts) {
+      const { name, phone, relationship, consent_given } = fc;
       if (!name || !phone || !relationship || consent_given === undefined) {
         return res.status(400).json({
           success: false,
-          error: 'Family contact must include name, phone, relationship, and consent_given'
+          error: 'Each family contact must include name, phone, relationship, and consent_given'
         });
       }
     }
@@ -281,15 +295,15 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       active: true
     });
 
-    // Create family contact if provided
-    if (family_contact) {
+    // Create all family contacts
+    for (const fc of contacts) {
       await FamilyContact.create({
         visit_id: visit.id,
-        name: family_contact.name,
-        phone: family_contact.phone,
-        relationship: family_contact.relationship,
-        email: family_contact.email || null,
-        consent_given: family_contact.consent_given
+        name: fc.name,
+        phone: fc.phone,
+        relationship: fc.relationship,
+        email: fc.email || null,
+        consent_given: fc.consent_given,
       });
     }
 
