@@ -5,9 +5,12 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --names \"server,client\" --prefix-colors \"cyan,magenta\" \"pnpm --filter or-tracking-backend dev\" \"pnpm --filter or-tracking-frontend dev\"",
-    "install:all": "pnpm --filter or-tracking-backend install && pnpm --filter or-tracking-frontend install"
+    "install:all": "pnpm --filter or-tracking-backend install && pnpm --filter or-tracking-frontend install",
+    "test": "pnpm --filter or-tracking-backend test && pnpm --filter or-tracking-frontend test",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "concurrently": "^9.0.0"
   },
   "pnpm": {

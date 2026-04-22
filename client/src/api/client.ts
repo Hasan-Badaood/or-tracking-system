@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isEncryptedPayload, decryptPayload, encryptionEnabled } from '../lib/crypto';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api',
@@ -17,7 +18,12 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    if (encryptionEnabled && isEncryptedPayload(response.data)) {
+      response.data = await decryptPayload(response.data);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');

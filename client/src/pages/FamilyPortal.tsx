@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { familyAPI, FamilyVisitStatus } from '@/api/family';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, RefreshCw, X } from 'lucide-react';
 
 type PortalStep = 'search' | 'otp' | 'status';
 
@@ -37,6 +37,7 @@ export const FamilyPortal: React.FC = () => {
   const [accessToken, setAccessToken] = useState('');
   const [visitStatus, setVisitStatus] = useState<FamilyVisitStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [showEmail, setShowEmail] = useState(false);
@@ -103,6 +104,23 @@ export const FamilyPortal: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchStatus();
+    setRefreshing(false);
+  };
+
+  const handleClose = () => {
+    setStep('search');
+    setVisitTrackingId('');
+    setEmail('');
+    setOtp('');
+    setAccessToken('');
+    setVisitStatus(null);
+    setLastRefreshed(null);
+    setError('');
   };
 
   const currentStageIdx = visitStatus
@@ -341,6 +359,25 @@ export const FamilyPortal: React.FC = () => {
                 </div>
                 <span className="text-white font-semibold text-sm">OR Tracking</span>
                 <span className="ml-auto text-xs text-slate-500 font-medium tracking-widest uppercase">Live</span>
+                <div className="flex items-center gap-1 ml-3">
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    title="Refresh status"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    title="Close"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <p className="text-slate-500 text-xs font-medium uppercase tracking-widest mb-1">Patient</p>
@@ -379,8 +416,9 @@ export const FamilyPortal: React.FC = () => {
                   <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-200" />
                   <div className="space-y-0">
                     {STAGE_ORDER.map((stageName, idx) => {
-                      const isCompleted = idx < currentStageIdx;
-                      const isCurrent = idx === currentStageIdx;
+                      const isDischarged = visitStatus?.current_stage.name === 'Discharged';
+                      const isCompleted = isDischarged ? idx <= currentStageIdx : idx < currentStageIdx;
+                      const isCurrent = !isDischarged && idx === currentStageIdx;
                       const isPending = idx > currentStageIdx;
 
                       return (
@@ -439,6 +477,19 @@ export const FamilyPortal: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {visitStatus.current_stage.name === 'Discharged' && visitStatus.discharge_note && (
+                <div className="mt-2 mb-4 flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-0.5">Discharge information</p>
+                    <p className="text-sm text-emerald-800">{visitStatus.discharge_note}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs text-slate-400 px-1">
                 <span>

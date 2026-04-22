@@ -156,11 +156,12 @@ export const visitsAPI = {
     return mapVisit(response.data.data);
   },
 
-  updateStage: async (id: number, toStageId: number, roomId?: number, notes?: string): Promise<Visit> => {
+  updateStage: async (id: number, toStageId: number, roomId?: number, notes?: string, dischargeNote?: string): Promise<Visit> => {
     const response = await apiClient.put(`/visits/${id}/stage`, {
       to_stage_id: toStageId,
       ...(roomId && { or_room_id: roomId }),
       ...(notes && { notes }),
+      ...(dischargeNote && { discharge_note: dischargeNote }),
     });
     return mapVisit(response.data.data.updated_visit);
   },

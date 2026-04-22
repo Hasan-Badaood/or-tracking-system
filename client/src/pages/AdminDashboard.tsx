@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { reportsAPI, DailySummary, StageDurationRow, DateRangeRow, AuditLogRow } from '@/api/reports';
-import { settingsAPI, SmtpConfig, ResendConfig } from '@/api/settings';
+import { settingsAPI, SmtpConfig, ResendConfig, TwilioConfig } from '@/api/settings';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -126,6 +126,21 @@ export const AdminDashboard: React.FC = () => {
   const [resendSendingTest, setResendSendingTest] = useState(false);
   const [resendSendTestResult, setResendSendTestResult] = useState<'ok' | 'fail' | null>(null);
   const [resendSendTestError, setResendSendTestError] = useState('');
+
+  // Settings: Twilio form
+  const emptyTwilioForm: TwilioConfig = { twilio_account_sid: '', twilio_auth_token: '', twilio_from: '' };
+  const [twilioForm, setTwilioForm] = useState<TwilioConfig>(emptyTwilioForm);
+  const [twilioLoading, setTwilioLoading] = useState(false);
+  const [twilioSaving, setTwilioSaving] = useState(false);
+  const [twilioTesting, setTwilioTesting] = useState(false);
+  const [twilioSaveError, setTwilioSaveError] = useState('');
+  const [twilioSaveSuccess, setTwilioSaveSuccess] = useState(false);
+  const [twilioTestResult, setTwilioTestResult] = useState<'ok' | 'fail' | null>(null);
+  const [twilioTestError, setTwilioTestError] = useState('');
+  const [twilioTestPhone, setTwilioTestPhone] = useState('');
+  const [twilioSendingTest, setTwilioSendingTest] = useState(false);
+  const [twilioSendTestResult, setTwilioSendTestResult] = useState<'ok' | 'fail' | null>(null);
+  const [twilioSendTestError, setTwilioSendTestError] = useState('');
 
   // Settings: stages management
   const [settingsStages, setSettingsStages] = useState<StageConfig[]>([]);
@@ -253,6 +268,11 @@ export const AdminDashboard: React.FC = () => {
       .then((cfg) => setSmtpForm(cfg))
       .catch(() => {})
       .finally(() => setSmtpLoading(false));
+    setTwilioLoading(true);
+    settingsAPI.getTwilio()
+      .then((cfg) => setTwilioForm(cfg))
+      .catch(() => {})
+      .finally(() => setTwilioLoading(false));
   }, [section]);
 
   const openAddStage = () => {
@@ -1695,7 +1715,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h2 className="font-semibold text-slate-800">Notifications</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Resend API settings for family email notifications</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Email and SMS settings for family notifications</p>
                   </div>
                   {notifConfig !== null && (
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${notifConfig.emailConfigured ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -1935,19 +1955,154 @@ export const AdminDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {notifConfig !== null && notifConfig.smsConfigured !== undefined && (
-                    <div className={`mt-6 rounded-xl border p-4 ${notifConfig.smsConfigured ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-                      <div className="flex items-center gap-2">
-                        {notifConfig.smsConfigured
-                          ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                          : <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-                        }
-                        <span className={`text-sm font-semibold ${notifConfig.smsConfigured ? 'text-emerald-700' : 'text-slate-500'}`}>
-                          SMS — {notifConfig.smsConfigured ? 'configured via Twilio env vars' : 'not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER)'}
+                  {/* Twilio SMS */}
+                  <div className="pt-6 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">SMS notifications (Twilio)</p>
+                      {notifConfig !== null && notifConfig.smsConfigured !== undefined && (
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${notifConfig.smsConfigured ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {notifConfig.smsConfigured
+                            ? <CheckCircle2 className="h-3.5 w-3.5" />
+                            : <AlertCircle className="h-3.5 w-3.5" />
+                          }
+                          {notifConfig.smsConfigured ? 'SMS active' : 'SMS not configured'}
                         </span>
-                      </div>
+                      )}
                     </div>
-                  )}
+                    {twilioLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                      </div>
+                    ) : (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setTwilioSaving(true);
+                          setTwilioSaveError('');
+                          setTwilioSaveSuccess(false);
+                          setTwilioTestResult(null);
+                          try {
+                            await settingsAPI.updateTwilio(twilioForm);
+                            setTwilioSaveSuccess(true);
+                            reportsAPI.getNotificationConfig().then(setNotifConfig).catch(() => {});
+                            setTimeout(() => setTwilioSaveSuccess(false), 3000);
+                          } catch (err: any) {
+                            setTwilioSaveError(err?.response?.data?.error ?? 'Failed to save');
+                          } finally {
+                            setTwilioSaving(false);
+                          }
+                        }}
+                        className="space-y-4"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-sm font-medium text-slate-700">Account SID</label>
+                            <input
+                              value={twilioForm.twilio_account_sid}
+                              onChange={(e) => setTwilioForm({ ...twilioForm, twilio_account_sid: e.target.value })}
+                              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
+                            />
+                            <p className="text-xs text-slate-400">Found on your Twilio Console dashboard</p>
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-sm font-medium text-slate-700">Auth token</label>
+                            <input
+                              type="password"
+                              value={twilioForm.twilio_auth_token}
+                              onChange={(e) => setTwilioForm({ ...twilioForm, twilio_auth_token: e.target.value })}
+                              placeholder={notifConfig?.smsConfigured ? 'Leave blank to keep existing' : 'Your Twilio auth token'}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-sm font-medium text-slate-700">From number</label>
+                            <input
+                              value={twilioForm.twilio_from}
+                              onChange={(e) => setTwilioForm({ ...twilioForm, twilio_from: e.target.value })}
+                              placeholder="+441234567890"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                            <p className="text-xs text-slate-400">Your Twilio phone number in E.164 format</p>
+                          </div>
+                        </div>
+
+                        {twilioSaveError && <p className="text-xs text-red-600">{twilioSaveError}</p>}
+                        {twilioSaveSuccess && <p className="text-xs text-emerald-600">Settings saved.</p>}
+                        {twilioTestResult === 'ok' && <p className="text-xs text-emerald-600">Credentials are valid.</p>}
+                        {twilioTestResult === 'fail' && <p className="text-xs text-red-600">Failed: {twilioTestError}</p>}
+
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="submit"
+                            disabled={twilioSaving}
+                            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                          >
+                            {twilioSaving ? 'Saving…' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={twilioTesting}
+                            onClick={async () => {
+                              setTwilioTesting(true);
+                              setTwilioTestResult(null);
+                              setTwilioTestError('');
+                              try {
+                                await settingsAPI.testTwilio();
+                                setTwilioTestResult('ok');
+                              } catch (err: any) {
+                                setTwilioTestResult('fail');
+                                setTwilioTestError(err?.response?.data?.error ?? 'Unknown error');
+                              } finally {
+                                setTwilioTesting(false);
+                              }
+                            }}
+                            className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                          >
+                            {twilioTesting ? 'Testing…' : 'Test credentials'}
+                          </button>
+                        </div>
+
+                        {/* Send test SMS */}
+                        <div className="pt-3 border-t border-slate-100">
+                          <p className="text-xs font-medium text-slate-600 mb-2">Send a test SMS</p>
+                          <div className="flex gap-2">
+                            <input
+                              type="tel"
+                              value={twilioTestPhone}
+                              onChange={(e) => { setTwilioTestPhone(e.target.value); setTwilioSendTestResult(null); }}
+                              placeholder="+447700900001"
+                              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            />
+                            <button
+                              type="button"
+                              disabled={twilioSendingTest || !twilioTestPhone.trim()}
+                              onClick={async () => {
+                                setTwilioSendingTest(true);
+                                setTwilioSendTestResult(null);
+                                setTwilioSendTestError('');
+                                try {
+                                  await settingsAPI.sendTestSms(twilioTestPhone.trim());
+                                  setTwilioSendTestResult('ok');
+                                } catch (err: any) {
+                                  setTwilioSendTestResult('fail');
+                                  setTwilioSendTestError(err?.response?.data?.error ?? 'Unknown error');
+                                } finally {
+                                  setTwilioSendingTest(false);
+                                }
+                              }}
+                              className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                              {twilioSendingTest ? 'Sending…' : 'Send'}
+                            </button>
+                          </div>
+                          {twilioSendTestResult === 'ok' && <p className="text-xs text-emerald-600 mt-1.5">Test SMS sent — check your phone.</p>}
+                          {twilioSendTestResult === 'fail' && <p className="text-xs text-red-600 mt-1.5">{twilioSendTestError}</p>}
+                          <p className="text-xs text-slate-400 mt-1">Number must be in E.164 format, e.g. +447700900001</p>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
               </div>
 

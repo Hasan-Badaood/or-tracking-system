@@ -33,6 +33,7 @@ export const UpdateStagePage: React.FC = () => {
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [notes, setNotes] = useState('');
+  const [dischargeNote, setDischargeNote] = useState('');
   const [notifying, setNotifying] = useState(false);
   const [notifyResult, setNotifyResult] = useState<{ email: number; sms: number } | null>(null);
   const [notifyError, setNotifyError] = useState('');
@@ -76,6 +77,11 @@ export const UpdateStagePage: React.FC = () => {
       return;
     }
 
+    if (isDischarging && !dischargeNote.trim()) {
+      setError('A discharge note is required (e.g. "Discharged to home" or "Discharged to Ward 3").');
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -84,7 +90,8 @@ export const UpdateStagePage: React.FC = () => {
         visit.id,
         selectedStageId,
         selectedRoomId ? parseInt(selectedRoomId) : undefined,
-        notes || undefined
+        notes || undefined,
+        dischargeNote.trim() || undefined
       );
       navigate(-1);
     } catch (err: any) {
@@ -128,9 +135,11 @@ export const UpdateStagePage: React.FC = () => {
   };
 
   const availableRooms = rooms.filter((r) => r.status === 'Available');
-  const needsRoom = selectedStageId
-    ? stages.find((s) => s.id === selectedStageId)?.name.trim().toLowerCase() === 'in theatre'
-    : false;
+  const selectedStageName = selectedStageId
+    ? stages.find((s) => s.id === selectedStageId)?.name.trim().toLowerCase()
+    : '';
+  const needsRoom = selectedStageName === 'in theatre';
+  const isDischarging = selectedStageName === 'discharged';
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], {
@@ -323,6 +332,27 @@ export const UpdateStagePage: React.FC = () => {
             </Card>
           )}
 
+          {/* Discharge note — required when moving to Discharged */}
+          {isDischarging && (
+            <Card className={!dischargeNote.trim() ? 'border-red-400' : ''}>
+              <CardContent className="pt-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-1">
+                  Discharge note
+                  <span className="ml-2 text-sm font-semibold text-red-600">* required</span>
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Visible to the family. Describe where the patient is going (e.g. "Discharged to home" or "Transferred to Ward 3").
+                </p>
+                <Textarea
+                  value={dischargeNote}
+                  onChange={(e) => setDischargeNote(e.target.value)}
+                  placeholder="Discharged to home"
+                  className={`min-h-[80px] resize-none ${!dischargeNote.trim() ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Notes */}
           <Card>
             <CardContent className="pt-6">
@@ -416,7 +446,7 @@ export const UpdateStagePage: React.FC = () => {
             <Button
               size="lg"
               onClick={handleUpdate}
-              disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id || (needsRoom && !selectedRoomId)}
+              disabled={saving || !selectedStageId || selectedStageId === visit.current_stage.id || (needsRoom && !selectedRoomId) || (isDischarging && !dischargeNote.trim())}
               className="px-8 bg-green-600 hover:bg-green-700 text-white"
             >
               {saving ? (

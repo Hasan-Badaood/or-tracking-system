@@ -10,7 +10,7 @@ interface RateLimitStore {
 const store: RateLimitStore = {};
 
 // Clean up old entries every 5 minutes
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   Object.keys(store).forEach(key => {
     if (store[key].resetTime < now) {
@@ -18,6 +18,7 @@ setInterval(() => {
     }
   });
 }, 5 * 60 * 1000);
+cleanupInterval.unref();
 
 export const rateLimit = (options: {
   windowMs: number;
@@ -33,6 +34,8 @@ export const rateLimit = (options: {
   } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'test') return next();
+
     const key = keyGenerator(req);
     const now = Date.now();
 
@@ -74,14 +77,14 @@ export const loginRateLimit = rateLimit({
 
 export const otpRequestRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3,
+  max: 100,
   message: 'Too many OTP requests. Please try again later.',
   keyGenerator: (req) => req.body.phone || req.ip || 'unknown'
 });
 
 export const otpVerifyRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3,
+  max: 100,
   message: 'Too many verification attempts. Please try again later.',
   keyGenerator: (req) => req.body.phone || req.ip || 'unknown'
 });

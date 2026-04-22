@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import twilio from 'twilio';
 import { SystemSetting } from '../models/SystemSetting';
 
 async function getResendClient(): Promise<{ client: Resend; from: string } | null> {
@@ -83,6 +84,35 @@ export const sendOTPEmail = async (
 
   // Neither configured — log for dev
   console.log(`[DEV] OTP email to ${to}: ${otp}`);
+};
+
+async function getTwilioClient(): Promise<{ client: twilio.Twilio; from: string } | null> {
+  try {
+    const rows = await SystemSetting.findAll({ where: { key: ['twilio_account_sid', 'twilio_auth_token', 'twilio_from'] } });
+    const db: Record<string, string> = {};
+    for (const row of rows) { if (row.value) db[row.key] = row.value; }
+    const sid   = db['twilio_account_sid'] ?? process.env.TWILIO_ACCOUNT_SID ?? '';
+    const token = db['twilio_auth_token']  ?? process.env.TWILIO_AUTH_TOKEN  ?? '';
+    const from  = db['twilio_from']        ?? process.env.TWILIO_FROM        ?? '';
+    if (!sid || !token || !from) return null;
+    return { client: twilio(sid, token), from };
+  } catch { return null; }
+}
+
+export const sendOTPSms = async (
+  to: string,
+  otp: string,
+  patientFirstName: string
+): Promise<void> => {
+  const body = `Your OR Tracker access code is: ${otp}\n\nThis code lets you check on ${patientFirstName}'s progress and expires in 15 minutes.`;
+
+  const tw = await getTwilioClient();
+  if (tw) {
+    await tw.client.messages.create({ from: tw.from, to, body });
+    return;
+  }
+
+  console.log(`[DEV] OTP SMS to ${to}: ${otp}`);
 };
 
 export const sendCredentialsEmail = async (
