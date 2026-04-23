@@ -96,7 +96,7 @@ export const AdminDashboard: React.FC = () => {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [roomDialog, setRoomDialog] = useState<'add' | 'edit' | null>(null);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
-  const [roomForm, setRoomForm] = useState({ name: '', room_number: '', room_type: 'General' });
+  const [roomForm, setRoomForm] = useState({ name: '', room_number: '', status: 'Available' as Room['status'] });
   const [roomFormError, setRoomFormError] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
   const [togglingRoomId, setTogglingRoomId] = useState<number | null>(null);
@@ -536,14 +536,14 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const openAddRoom = () => {
-    setRoomForm({ name: '', room_number: '', room_type: 'General' });
+    setRoomForm({ name: '', room_number: '', status: 'Available' });
     setRoomFormError('');
     setEditingRoom(null);
     setRoomDialog('add');
   };
 
   const openEditRoom = (room: Room) => {
-    setRoomForm({ name: room.name, room_number: room.room_number ?? '', room_type: room.room_type ?? 'General' });
+    setRoomForm({ name: room.name, room_number: room.room_number ?? '', status: room.status ?? 'Available' });
     setRoomFormError('');
     setEditingRoom(room);
     setRoomDialog('edit');
@@ -559,10 +559,15 @@ export const AdminDashboard: React.FC = () => {
     setSavingRoom(true);
     try {
       if (roomDialog === 'add') {
-        const created = await roomsAPI.create({ name: roomForm.name.trim(), room_number: roomForm.room_number.trim(), room_type: roomForm.room_type });
+        const created = await roomsAPI.create({ name: roomForm.name.trim(), room_number: roomForm.room_number.trim() });
+        // Set status after creation if not default
+        if (roomForm.status !== 'Available') {
+          await roomsAPI.updateStatus(created.id, roomForm.status);
+          created.status = roomForm.status;
+        }
         setSettingsRooms((prev) => [...prev, created]);
       } else if (editingRoom) {
-        const updated = await roomsAPI.update(editingRoom.id, { name: roomForm.name.trim(), room_number: roomForm.room_number.trim(), room_type: roomForm.room_type });
+        const updated = await roomsAPI.update(editingRoom.id, { name: roomForm.name.trim(), room_number: roomForm.room_number.trim(), status: roomForm.status });
         setSettingsRooms((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       }
       setRoomDialog(null);
@@ -2402,16 +2407,16 @@ export const AdminDashboard: React.FC = () => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Room type</label>
-              <Select value={roomForm.room_type} onValueChange={(val) => setRoomForm({ ...roomForm, room_type: val })}>
+              <label className="text-sm font-medium text-slate-700">Status</label>
+              <Select value={roomForm.status} onValueChange={(val) => setRoomForm({ ...roomForm, status: val as Room['status'] })}>
                 <SelectTrigger className="bg-slate-50 border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="General">General</SelectItem>
-                  <SelectItem value="Recovery">Recovery</SelectItem>
-                  <SelectItem value="Prep">Prep</SelectItem>
-                  <SelectItem value="Emergency">Emergency</SelectItem>
+                  <SelectItem value="Available">Available</SelectItem>
+                  <SelectItem value="Occupied">Occupied</SelectItem>
+                  <SelectItem value="Cleaning">Cleaning</SelectItem>
+                  <SelectItem value="Maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
             </div>

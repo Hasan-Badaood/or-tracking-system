@@ -37,7 +37,7 @@ export const roomsAPI = {
     return response.data.room;
   },
 
-  update: async (id: number, data: { name?: string; room_number?: string; room_type?: string; active?: boolean }): Promise<Room> => {
+  update: async (id: number, data: { name?: string; room_number?: string; room_type?: string; status?: Room['status']; active?: boolean }): Promise<Room> => {
     const response = await apiClient.put(`/rooms/${id}`, data);
     return response.data.room;
   },

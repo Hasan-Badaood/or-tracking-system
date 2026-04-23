@@ -297,7 +297,12 @@ export const updateRoom = async (req: AuthRequest, res: Response) => {
     }
 
     const { id } = req.params;
-    const { name, room_number, room_type, active } = req.body;
+    const { name, room_number, room_type, status, active } = req.body;
+
+    const VALID_STATUSES = ['Available', 'Occupied', 'Cleaning', 'Maintenance'];
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status value' });
+    }
 
     const room = await ORRoom.findByPk(id);
     if (!room) {
@@ -307,6 +312,7 @@ export const updateRoom = async (req: AuthRequest, res: Response) => {
     if (name !== undefined) room.name = name;
     if (room_number !== undefined) room.room_number = room_number;
     if (room_type !== undefined) room.room_type = room_type;
+    if (status !== undefined) room.status = status;
     if (active !== undefined) room.active = active;
     await room.save();
 
