@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { addToBlocklist } from '../lib/tokenBlocklist';
+import { isLoginRateLimited, recordLoginFailure, clearLoginFailures } from '../middleware/rateLimit';
 
 interface AuthRequest extends Request {
   user?: {
@@ -24,6 +25,7 @@ const getRolePermissions = (role: string): string[] => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
+    const ip = req.ip ?? 'unknown';
 
     if (!username || !password) {
       return res.status(400).json({
@@ -32,9 +34,17 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
+    if (isLoginRateLimited(ip)) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many failed login attempts. Please try again later.'
+      });
+    }
+
     const user = await User.findOne({ where: { username } });
 
     if (!user) {
+      recordLoginFailure(ip);
       return res.status(401).json({
         success: false,
         error: 'Invalid username or password'
@@ -51,11 +61,14 @@ export const login = async (req: Request, res: Response) => {
     const validPassword = await user.comparePassword(password);
 
     if (!validPassword) {
+      recordLoginFailure(ip);
       return res.status(401).json({
         success: false,
         error: 'Invalid username or password'
       });
     }
+
+    clearLoginFailures(ip);
 
     // Update last login
     user.last_login = new Date();

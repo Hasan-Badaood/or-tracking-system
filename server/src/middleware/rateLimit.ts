@@ -68,12 +68,30 @@ export const rateLimit = (options: {
   };
 };
 
-// Specific rate limiters
-export const loginRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
-  message: 'Too many login attempts. Please try again later.'
-});
+// ── Login: only failed attempts count ────────────────────────────────────────
+// Keyed by IP, blocks after 10 failures within 15 minutes.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 10;
+
+export function isLoginRateLimited(ip: string): boolean {
+  const entry = store[`login:${ip}`];
+  if (!entry || entry.resetTime < Date.now()) return false;
+  return entry.count >= LOGIN_MAX_FAILURES;
+}
+
+export function recordLoginFailure(ip: string): void {
+  const key = `login:${ip}`;
+  const now = Date.now();
+  if (!store[key] || store[key].resetTime < now) {
+    store[key] = { count: 1, resetTime: now + LOGIN_WINDOW_MS };
+  } else {
+    store[key].count++;
+  }
+}
+
+export function clearLoginFailures(ip: string): void {
+  delete store[`login:${ip}`];
+}
 
 export const otpRequestRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
