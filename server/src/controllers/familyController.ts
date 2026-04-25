@@ -19,7 +19,8 @@ const STAGE_ORDER = ['Arrived', 'Pre-Op Assessment', 'Ready for Theatre', 'In Th
 // POST /family/request-otp - Request OTP for family access
 export const requestOTP = async (req: Request, res: Response) => {
   try {
-    const { visit_tracking_id, email, phone } = req.body;
+    const { visit_tracking_id: raw_id, email, phone } = req.body;
+    const visit_tracking_id = typeof raw_id === 'string' ? raw_id.trim().toUpperCase() : raw_id;
 
     if (!visit_tracking_id) {
       return res.status(400).json({
@@ -173,7 +174,8 @@ export const requestOTP = async (req: Request, res: Response) => {
 // POST /family/verify-otp - Verify OTP and get access token
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
-    const { visit_tracking_id, otp } = req.body;
+    const { visit_tracking_id: raw_id, otp } = req.body;
+    const visit_tracking_id = typeof raw_id === 'string' ? raw_id.trim().toUpperCase() : raw_id;
 
     if (!visit_tracking_id || !otp) {
       return res.status(400).json({

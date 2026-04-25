@@ -177,7 +177,7 @@ export const FamilyPortal: React.FC = () => {
                       id="visitId"
                       type="text"
                       value={visitTrackingId}
-                      onChange={(e) => setVisitTrackingId(e.target.value.toUpperCase())}
+                      onChange={(e) => setVisitTrackingId(e.target.value.trim().toUpperCase())}
                       placeholder="VT-20260305-001"
                       required
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
