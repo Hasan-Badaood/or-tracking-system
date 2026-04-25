@@ -13,7 +13,7 @@ services:
       - key: PORT
         value: 3000
       - key: DB_HOST
-        value: ep-winter-band-aiyourfe-pooler.c-4.us-east-1.aws.neon.tech
+        value: ep-winter-band-aiyourfe.c-4.us-east-1.aws.neon.tech
       - key: DB_PORT
         value: 5432
       - key: DB_NAME
