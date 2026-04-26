@@ -1304,19 +1304,26 @@ export const AdminDashboard: React.FC = () => {
                               ) : '—'}
                             </td>
                             <td className="hidden lg:table-cell px-5 py-3 text-xs text-slate-400 max-w-xs">
-                              {!row.notes && !row.visit_notes && !row.discharge_note ? '—' : (
-                                <div className="space-y-1">
-                                  {row.notes && (
-                                    <div className="truncate"><span className="text-slate-300 mr-1">Transition:</span>{row.notes}</div>
-                                  )}
-                                  {row.visit_notes && (
-                                    <div className="truncate"><span className="text-slate-300 mr-1">Note:</span>{row.visit_notes}</div>
-                                  )}
-                                  {row.discharge_note && (
-                                    <div className="truncate"><span className="text-slate-300 mr-1">Discharge:</span>{row.discharge_note}</div>
-                                  )}
-                                </div>
-                              )}
+                              {(() => {
+                                const isAdmission = row.from_stage === null;
+                                const isDischarged = row.to_stage?.name === 'Discharged';
+                                const showVisitNotes = isAdmission && row.visit_notes;
+                                const showDischarge = isDischarged && row.discharge_note;
+                                if (!row.notes && !showVisitNotes && !showDischarge) return '—';
+                                return (
+                                  <div className="space-y-1">
+                                    {row.notes && (
+                                      <div className="truncate">{row.notes}</div>
+                                    )}
+                                    {showVisitNotes && (
+                                      <div className="truncate"><span className="text-slate-300 mr-1">Note:</span>{row.visit_notes}</div>
+                                    )}
+                                    {showDischarge && (
+                                      <div className="truncate"><span className="text-slate-300 mr-1">Discharge:</span>{row.discharge_note}</div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                           </tr>
                         ))}
