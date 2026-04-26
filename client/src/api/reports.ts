@@ -34,6 +34,8 @@ export interface AuditLogRow {
   to_stage:   { name: string; color: string } | null;
   updated_by: { name: string; role: string } | null;
   notes: string | null;
+  visit_notes: string | null;
+  discharge_note: string | null;
 }
 
 export interface DateRangeRow {

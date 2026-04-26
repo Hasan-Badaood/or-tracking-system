@@ -1303,7 +1303,21 @@ export const AdminDashboard: React.FC = () => {
                                 <span>{row.updated_by.name} <span className="text-slate-400">({row.updated_by.role})</span></span>
                               ) : '—'}
                             </td>
-                            <td className="hidden lg:table-cell px-5 py-3 text-xs text-slate-400 max-w-xs truncate">{row.notes ?? '—'}</td>
+                            <td className="hidden lg:table-cell px-5 py-3 text-xs text-slate-400 max-w-xs">
+                              {!row.notes && !row.visit_notes && !row.discharge_note ? '—' : (
+                                <div className="space-y-1">
+                                  {row.notes && (
+                                    <div className="truncate"><span className="text-slate-300 mr-1">Transition:</span>{row.notes}</div>
+                                  )}
+                                  {row.visit_notes && (
+                                    <div className="truncate"><span className="text-slate-300 mr-1">Note:</span>{row.visit_notes}</div>
+                                  )}
+                                  {row.discharge_note && (
+                                    <div className="truncate"><span className="text-slate-300 mr-1">Discharge:</span>{row.discharge_note}</div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

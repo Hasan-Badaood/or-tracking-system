@@ -265,7 +265,7 @@ export const getAuditLog = async (req: Request, res: Response) => {
         {
           model: Visit,
           as: 'visit',
-          attributes: ['visit_tracking_id'],
+          attributes: ['visit_tracking_id', 'notes', 'discharge_note'],
           include: [{ model: Patient, as: 'patient', attributes: ['first_name', 'last_name'] }],
         },
         { model: Stage, as: 'from_stage', attributes: ['name', 'color'] },
@@ -285,6 +285,8 @@ export const getAuditLog = async (req: Request, res: Response) => {
       to_stage:   e.to_stage   ? { name: e.to_stage.name,   color: e.to_stage.color   } : null,
       updated_by: e.updated_by_user ? { name: e.updated_by_user.name, role: e.updated_by_user.role } : null,
       notes: e.notes ?? null,
+      visit_notes: e.visit?.notes ?? null,
+      discharge_note: e.visit?.discharge_note ?? null,
     }));
 
     res.json({ success: true, total: events.count, rows });
