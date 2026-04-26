@@ -54,7 +54,6 @@ export const getVisits = async (req: Request, res: Response) => {
       limit = 10
     } = req.query;
 
-    // Build where clause
     const where: any = {};
 
     if (active !== undefined) {
@@ -80,25 +79,21 @@ export const getVisits = async (req: Request, res: Response) => {
       };
     }
 
-    // Search across visit_tracking_id, patient name, and MRN using a flat OR
-    // so that a match on any one field is sufficient (avoids the INNER JOIN
-    // killing results when only the tracking ID matches).
     if (search) {
       const s = `%${search}%`;
+
       where[Op.or] = [
-        { visit_tracking_id: { [Op.like]: s } },
-        { '$patient.first_name$': { [Op.like]: s } },
-        { '$patient.last_name$':  { [Op.like]: s } },
-        { '$patient.mrn$':        { [Op.like]: s } },
+        { visit_tracking_id: { [Op.iLike]: s } },
+        { '$patient.first_name$': { [Op.iLike]: s } },
+        { '$patient.last_name$': { [Op.iLike]: s } },
+        { '$patient.mrn$': { [Op.iLike]: s } },
       ];
     }
 
-    // Calculate pagination
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
     const offset = (pageNum - 1) * limitNum;
 
-    // Fetch visits with associations
     const { count, rows: visits } = await Visit.findAndCountAll({
       where,
       include: [
@@ -133,7 +128,10 @@ export const getVisits = async (req: Request, res: Response) => {
       order: [['created_at', 'DESC']],
       limit: limitNum,
       offset,
-      distinct: true
+      distinct: true,
+
+      //prevent Sequelize from generating subqueries which can break pagination with includes
+      subQuery: false
     });
 
     const totalPages = Math.ceil(count / limitNum);
@@ -148,6 +146,7 @@ export const getVisits = async (req: Request, res: Response) => {
         total_pages: totalPages
       }
     });
+
   } catch (error) {
     console.error('Get visits error:', error);
     res.status(500).json({
